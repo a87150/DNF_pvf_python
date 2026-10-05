@@ -61,27 +61,9 @@ def decrypt_Bytes(inputBytes:bytes,crc):
     value_2 = value_Xored_all & mask_2_all
     value = value_1<<26 | value_2>>6
     return value.to_bytes(4*int_num,'little')
-try:
-    import ctypes
-
-    # Load the DLL
-    dll_path = './DLL1.dll'
-    dll = ctypes.CDLL(dll_path)
-
-    # Define the function prototype
-    unpackHeaderTree = dll.unpackHeaderTree
-    unpackHeaderTree.argtypes = (ctypes.POINTER(ctypes.c_uint8), ctypes.c_int, ctypes.c_uint32)
-    unpackHeaderTree.restype = None
-except:
-    pass
 
 
 
-def decrypt_Bytes2(inputBytes,crc32):
-    fileLen = len(inputBytes)
-    byteArr_c = (ctypes.c_uint8 * fileLen)(*inputBytes)
-    unpackHeaderTree(byteArr_c, fileLen, crc32)
-    return bytearray(byteArr_c)
 
 def rec_merge(d1, d2)->dict:
     """
@@ -409,10 +391,6 @@ class TinyPVF():
                     valuesRead.append(value)
         return [typesInList,valuesRead]
     
-    def read_File_In_List_FROM_Bytes(self,fileInBytes):
-        stringtable = self.stringTable
-        nString  = self.nString
-        return self.content2List(fileInBytes,stringtable,nString)
 
     def convert_Bin_to_List(self,content=b'',pvfheader:PVFHeader=None,stringtable:StringTable=None,nString:Lst_lite2=None,fileTreeDict:dict=None,stringQuote=''):
         if pvfheader is None:
@@ -651,9 +629,6 @@ class TinyPVF():
                     return seg
         return None
 
-    @staticmethod
-    def content2Dict(content,stringtable:StringTable,nString:Lst_lite2,stringQuote=''):
-        return TinyPVF.list2Dict(TinyPVF.content2List(content,stringtable,nString,stringQuote=''))
     
     @staticmethod
     def dictSegment2text(dictSegment:dict,prefix='',prefixAdd='    ',maxSegNum=50,depth=4)->str:
@@ -725,21 +700,6 @@ class TinyPVF():
                 segment.append(value)
         return segment   
 
-    def read_Segment_With_Key_Old(self,fpath='',key='')->list:
-        '''将指定二进制文件按stk规则读取后返回dict'''
-        fileInListWithType = self.read_File_In_List2(fpath)
-        start = False
-        res = []
-        for value in fileInListWithType[1]:
-            if value == key:
-                start = True
-            elif start and len(str(value))>0 and str(value)[0]=='[' and str(value)[-1]==']':
-                if len(res) == 0:
-                    res.append(value)
-                break
-            elif start:
-                res.append(value)
-        return res   
     
 def get_Magic_Seal_Dict2(pvf:TinyPVF):
     import zhconv
@@ -1313,28 +1273,6 @@ def test_new_list2Dict():
     for line in fileInListStructed:
         print(line)
 
-def get_stk_segkeys():
-    PVF = r'E:\system sound infomation\客户端20221030\客户端20230212\KHD\Script_ori.pvf'
-    pvfHeader=PVFHeader(PVF)
-    print(pvfHeader)
-    pvf = TinyPVF(pvfHeader=pvfHeader)   
-    pvf.load_Leafs(['stackable'])
-    idNameDict,detailDict = get_Stackable_dict3(pvf)
-    stkTypeDict = {}
-    print('加载物品分类和字段...')
-    for itemID,itemDict in detailDict.items():
-        stkType = itemDict.get('[stackable type]')
-        stkName = itemDict.get('[name]')[0]
-        typeStr,typeValue = stkType
-        if stkTypeDict.get(typeStr) is None:
-            stkTypeDict[typeStr] = {}
-        if stkTypeDict[typeStr].get(typeValue) is None:
-            stkTypeDict[typeStr][typeValue] = []
-        for key in itemDict.keys():
-            if key not in stkTypeDict[typeStr][typeValue]:
-                stkTypeDict[typeStr][typeValue].append(key)
-    with open('./config/stkTypeDict.json','w',errors='replace') as f:
-        json.dump(stkTypeDict,f,ensure_ascii=False)
 
 def get_equ_segkeys():
     PVF = r'E:\system sound infomation\客户端20221030\客户端20230212\KHD\Script_ori.pvf'

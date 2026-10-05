@@ -19,24 +19,7 @@ from .widgets.toolTip import CreateToolTip
 from . import cacheManager as cacheM
 from .EtcEditFrame import EtcframeWidget
 from .skillEditFrame import SkilleditframeWidget
-if not hasattr(ttk,'Spinbox'):
-    class Spinbox(ttk.Entry):
-        def __init__(self, master=None, **kw):  #from_=0,to=99,
-            ttk.Entry.__init__(self, master, "ttk::spinbox", **kw)
-        def set(self, value):
-            self.tk.call(self._w, "set", value)
-    ttk.Spinbox = Spinbox
-rarityMap = {
-    0:'普通',
-    1:'高级',
-    2:'稀有',
-    3:'神器',
-    4:'史诗',
-    5:'勇者',
-    6:'传说',
-    7:'神话',
-    
-}
+rarityMap = cacheM.rarityMap
 
 oldPrint = print
 logFunc = [oldPrint]
@@ -407,10 +390,212 @@ class WasteframeWidget(ttk.Frame):
         return res
 
 
+ALLTYPE = '----'
+
+def _avatar_Rarity_Suffix(fileInDict:dict):
+    """装备表用：时装类物品在稀有度后补'时装'（与原"装备专用搜索"一致）"""
+    equipmentType = fileInDict.get('[equipment type]')
+    if 'avatar' in str(equipmentType) or ('avatar' in str(fileInDict.keys()) and '[stackable type]' in fileInDict):
+        return '时装'
+    return ''
+
+
+class ItemSearchPanel(ttk.Labelframe):
+    """筛选条件 + 结果树 + 提交（道具/装备两个 tab 共用）。
+    isEquipment=True 时加装备三级分类，并按装备规则筛选（等级不归一、稀有度补'时装'）。"""
+    def __init__(self,master,isEquipment=False,onPick=None,onSubmitBag=None,onSubmitMail=None,**kw):
+        kw.setdefault('text','搜索')
+        super(ItemSearchPanel,self).__init__(master,**kw)
+        self.isEquipment = isEquipment
+        self.onPick = onPick
+        self.onSubmitBag = onSubmitBag
+        self.onSubmitMail = onSubmitMail
+        row0 = ttk.Frame(self)
+        row0.pack(fill='x',side='top')
+        ttk.Label(row0,text='关键词',width=6).pack(side='left')
+        self.nameE = ttk.Entry(row0)
+        self.nameE.pack(expand=True,fill='x',side='left')
+        self.nameE.bind('<Return>',lambda e:self.run_Search())
+        ttk.Button(row0,text='查询',width=6,command=self.run_Search).pack(side='left')
+        row1 = ttk.Frame(self)
+        row1.pack(fill='x',side='top',pady=2)
+        ttk.Label(row1,text='稀有度',width=6).pack(side='left')
+        self.rarityE = ttk.Combobox(row1,values=[ALLTYPE,*cacheM.rarityMapRev.keys()],width=8,state='readonly')
+        self.rarityE.set(ALLTYPE)
+        self.rarityE.pack(side='left')
+        ttk.Label(row1,text=' 等级').pack(side='left')
+        self.minLevE = ttk.Spinbox(row1,from_=0,to=999,width=5)
+        self.minLevE.pack(side='left')
+        ttk.Label(row1,text='-').pack(side='left')
+        self.maxLevE = ttk.Spinbox(row1,from_=0,to=999,width=5)
+        self.maxLevE.pack(side='left')
+        row2 = ttk.Frame(self)
+        row2.pack(fill='x',side='top')
+        self.fuzzyVar = tk.IntVar()
+        ttk.Checkbutton(row2,text='模糊',variable=self.fuzzyVar).pack(side='left')
+        self.usePVFVar = tk.IntVar()
+        ttk.Checkbutton(row2,text='搜PVF文本',variable=self.usePVFVar).pack(side='left')
+        row3 = ttk.Frame(self)
+        row3.pack(fill='x',side='top',pady=2)
+        ttk.Label(row3,text='分类',width=6).pack(side='left')
+        self.typeE = ttk.Combobox(row3,values=[ALLTYPE],width=8,state='readonly')
+        self.typeE.set(ALLTYPE)
+        self.typeE.pack(side='left')
+        self.typeE.bind('<Button-1>',lambda e:self._load_Types())
+        self.typeE2 = None
+        self.typeE3 = None
+        if isEquipment:
+            self.typeE.bind('<<ComboboxSelected>>',self._select_Type2)
+            self.typeE2 = ttk.Combobox(row3,values=[ALLTYPE],width=8,state='disabled')
+            self.typeE2.set(ALLTYPE)
+            self.typeE2.pack(side='left')
+            self.typeE2.bind('<<ComboboxSelected>>',self._select_Type3)
+            self.typeE3 = ttk.Combobox(row3,values=[ALLTYPE],width=8,state='disabled')
+            self.typeE3.set(ALLTYPE)
+            self.typeE3.pack(side='left')
+        treeFrame = ttk.Frame(self)
+        treeFrame.pack(expand=True,fill='both',side='top')
+        self.resultTree = ttk.Treeview(treeFrame,columns=('1','2','3','4','5'),show='headings',selectmode='browse')
+        for colID,colText,colWidth in (('1','物品ID',60),('2','物品名',180),('3','种类',70),('4','等级',40),('5','稀有度',60)):
+            self.resultTree.column(colID,width=colWidth,anchor='c')
+            self.resultTree.heading(colID,text=colText)
+        self.resultTree.pack(expand=True,fill='both',side='left')
+        bar = ttk.Scrollbar(treeFrame,orient='vertical')
+        bar.pack(fill='y',side='right')
+        bar.config(command=self.resultTree.yview)
+        self.resultTree.config(yscrollcommand=bar.set)
+        self.resultTree.bind('<<TreeviewSelect>>',self._select_Result)
+        btnFrame = ttk.Frame(self)
+        btnFrame.pack(fill='x',side='top',pady=2)
+        ttk.Button(btnFrame,text='提交编辑',command=lambda:self._submit(self.onSubmitBag)).pack(expand=True,fill='x',side='left')
+        ttk.Button(btnFrame,text='提交邮件',command=lambda:self._submit(self.onSubmitMail)).pack(expand=True,fill='x',side='right')
+
+    def _load_Types(self):
+        """分类候选延迟到真要用时再取（缓存与PVF数据是运行中才加载好的）"""
+        if self.isEquipment:
+            names = [ALLTYPE,*cacheM.equipmentForamted.keys()]
+        else:
+            names = [ALLTYPE,*cacheM.formatedTypeDict.keys()]
+        if list(self.typeE['values']) != names:
+            self.typeE.config(values=names)
+
+    def _select_Type2(self,e=None):
+        type1 = self.typeE.get()
+        if type1 != ALLTYPE:
+            self.typeE2.config(values=[ALLTYPE,*cacheM.equipmentForamted[type1].keys()],state='readonly')
+        else:
+            self.typeE2.config(values=[],state='disabled')
+            self.typeE3.config(values=[],state='disabled')
+        self.typeE2.set(ALLTYPE)
+        self.typeE3.set(ALLTYPE)
+
+    def _select_Type3(self,e=None):
+        type1 = self.typeE.get()
+        type2 = self.typeE2.get()
+        if type2 != ALLTYPE and type1 not in ['首饰','特殊装备']:
+            self.typeE3.config(values=[ALLTYPE,*cacheM.equipmentForamted[type1][type2].keys()],state='readonly')
+        else:
+            self.typeE3.config(values=[],state='disabled')
+        self.typeE3.set(ALLTYPE)
+
+    def _equipment_Dict(self):
+        """按三级分类拼出 {id:名称} 与 {id:小分类}（原"装备专用搜索"逻辑）"""
+        type1 = self.typeE.get().split('-')[-1]
+        type2 = self.typeE2.get().split('-')[-1]
+        type3 = self.typeE3.get().split('-')[-1]
+        typeDict = {}
+        if type1 == '':
+            return cacheM.equipmentDict.copy(),typeDict
+        if type1 in ['首饰','特殊装备']:
+            if type2 == '':
+                searchDict = {}
+                for typeName,equDict in cacheM.equipmentForamted[type1].items():
+                    for id_ in equDict.keys():
+                        typeDict[id_] = typeName
+                    searchDict.update(equDict)
+            else:
+                searchDict = cacheM.equipmentForamted[type1][type2]
+                for id_ in searchDict.keys():
+                    typeDict[id_] = type2
+        elif type2 == '':
+            searchDict = {}
+            for typeDict_ in cacheM.equipmentForamted[type1].values():
+                for typeName,equDict in typeDict_.items():
+                    searchDict.update(equDict)
+                    for id_ in equDict.keys():
+                        typeDict[id_] = typeName
+        elif type3 == '':
+            searchDict = {}
+            for typeName,equDict in cacheM.equipmentForamted[type1][type2].items():
+                searchDict.update(equDict)
+                for id_ in equDict.keys():
+                    typeDict[id_] = typeName
+        else:
+            searchDict = cacheM.equipmentForamted[type1][type2][type3]
+            for id_ in searchDict.keys():
+                typeDict[id_] = type3
+        return searchDict,typeDict
+
+    def run_Search(self):
+        self._load_Types()
+        self.resultTree.delete(*self.resultTree.get_children())
+        nameKey = self.nameE.get()
+        levMin = int(0 if self.minLevE.get()=='' else self.minLevE.get())
+        levMax = int(999 if self.maxLevE.get()=='' else self.maxLevE.get())
+        rarity = self.rarityE.get()
+        usePVF = bool(self.usePVFVar.get())
+        fuzzy = bool(self.fuzzyVar.get())
+        rows = []
+        if self.isEquipment:
+            searchDict,typeDict = self._equipment_Dict()
+            res = cacheM.search_Items(searchDict,nameKey,levMin,levMax,rarity,fuzzy=fuzzy,usePVFText=usePVF,
+                                      limit=100000,raritySuffix=_avatar_Rarity_Suffix)
+            rows = [[itemID,name,typeDict.get(itemID) if typeDict else '',lev,itemRarity]
+                    for itemID,name,lev,itemRarity,_ in res]
+        else:
+            typeKey = self.typeE.get()
+            res = cacheM.search_Items(cacheM.stackableDict,nameKey,levMin,levMax,rarity,fuzzy=fuzzy,
+                                      usePVFText=usePVF,limit=10000,normalize=True)
+            for itemID,name,lev,itemRarity,fileInDict in res:
+                typeInList = fileInDict.get('[stackable type]')
+                itemType = typeInList[0][1:-1] if typeInList is not None else None
+                if typeKey != ALLTYPE and itemType not in cacheM.formatedTypeDict[typeKey].keys():
+                    continue
+                resType = cacheM.typeDict.get(itemType)
+                rows.append([itemID,name,resType[1] if resType is not None else itemType,lev,itemRarity])
+        for row in rows:
+            try:
+                self.resultTree.insert('',tk.END,values=row)
+            except:
+                break
+
+    def _select_Result(self,e=None):
+        itemID = self.selected_ID()
+        if itemID is not None and self.onPick is not None:
+            self.onPick(itemID)
+
+    def selected_ID(self):
+        values = self.resultTree.item(self.resultTree.focus())['values']
+        if not values:
+            return None
+        try:
+            return int(values[0])
+        except:
+            return None
+
+    def _submit(self,func):
+        itemID = self.selected_ID()
+        if itemID is not None and func is not None:
+            func(itemID)
+
+
 class PvfeditstackableframeWidget(ttk.Frame):
-    def __init__(self, master=None, **kw):
+    def __init__(self, master=None, onSubmitBag=None, onSubmitMail=None, **kw):
         super(PvfeditstackableframeWidget, self).__init__(master, **kw)
-        self.editedListFrame = ttk.Labelframe(self)
+        self.onSubmitBag = onSubmitBag
+        self.onSubmitMail = onSubmitMail
+        self.leftColumn = ttk.Frame(self)
+        self.editedListFrame = ttk.Labelframe(self.leftColumn)
         self.editedListFrame.configure(height=200, text='已编辑列表', width=300)
         self.searchNameE = ttk.Combobox(self.editedListFrame)
         self.searchNameE.pack(fill="x", side="top")
@@ -447,7 +632,11 @@ class PvfeditstackableframeWidget(ttk.Frame):
         self.delLeafBtn.pack(fill="x", side="top")
         self.delLeafBtn.configure(command=self.remove_selected_item)
         self.treeViewBtnFrame.pack(fill="x", side="top")
-        self.editedListFrame.pack(expand="true", fill="both", side="left")
+        self.searchPanel = ItemSearchPanel(self.leftColumn,isEquipment=False,
+                                           onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail)
+        self.searchPanel.pack(expand="true", fill="both", side="top")
+        self.editedListFrame.pack(expand="true", fill="both", side="top")
+        self.leftColumn.pack(expand="true", fill="both", side="left")
         self.itemEditFrame = ttk.Labelframe(self)
         self.itemEditFrame.configure(height=200, text='道具数据修改', width=200)
         self.itemInfoFrame = ttk.Frame(self.itemEditFrame)
@@ -648,7 +837,7 @@ class PvfeditstackableframeWidget(ttk.Frame):
         self.editedTree.heading("3", text ="物品ID")
         _ = self.editedTree.insert('',tk.END,values=[])
         self.editedTree.delete(_)
-        self.stkTypeE.config(values=list(SegKeyDict['stackable'].keys()))
+        self.stkTypeE.config(values=list(SegKeyDict.get('stackable',{}).keys()))
         self.exFramesDict = {
             '[waste]': WasteframeWidget
         }
@@ -731,6 +920,16 @@ class PvfeditstackableframeWidget(ttk.Frame):
     def enable_Btns(self):
         self.editThisBtn.config(state='normal')
         #self.copyThisBtn.config(state='normal')
+    def pick_Search_Item(self,itemID):
+        """搜索结果选中后填入 ID 框并载入字段（未加载 PVF 时只填 ID）"""
+        self.searchNameE.config(values=[])
+        self.searchNameE.delete(0,tk.END)
+        self.searchNameE.insert(0,str(cacheM.ITEMS_dict.get(itemID)))
+        self.idE.delete(0,tk.END)
+        self.idE.insert(0,itemID)
+        if self.pvf is not None:
+            self.btn_edit_file()
+
 
     def btn_edit_file(self):
         try:
@@ -888,9 +1087,12 @@ class PvfeditstackableframeWidget(ttk.Frame):
                 self.searchNameE.config(values=[str([item[0]])+' '+item[1] for item in res])
 
 class PvfeditequipmentframeWidget(ttk.Frame):
-    def __init__(self, master=None, **kw):
+    def __init__(self, master=None, onSubmitBag=None, onSubmitMail=None, **kw):
         super(PvfeditequipmentframeWidget, self).__init__(master, **kw)
-        self.editedListFrame = ttk.Labelframe(self)
+        self.onSubmitBag = onSubmitBag
+        self.onSubmitMail = onSubmitMail
+        self.leftColumn = ttk.Frame(self)
+        self.editedListFrame = ttk.Labelframe(self.leftColumn)
         self.editedListFrame.configure(height=200, text='已编辑列表', width=200)
         self.searchNameE = ttk.Combobox(self.editedListFrame)
         self.searchNameE.pack(fill="x", side="top")
@@ -927,7 +1129,11 @@ class PvfeditequipmentframeWidget(ttk.Frame):
         self.delLeafBtn.pack(fill="x", side="top")
         self.delLeafBtn.configure(command=self.remove_selected_item)
         self.treeViewBtnFrame.pack(fill="x", side="top")
-        self.editedListFrame.pack(expand="true", fill="both", side="left")
+        self.searchPanel = ItemSearchPanel(self.leftColumn,isEquipment=True,
+                                           onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail)
+        self.searchPanel.pack(expand="true", fill="both", side="top")
+        self.editedListFrame.pack(expand="true", fill="both", side="top")
+        self.leftColumn.pack(expand="true", fill="both", side="left")
         self.itemEditFrame = ttk.Labelframe(self)
         self.itemEditFrame.configure(height=200, text='装备数据修改', width=200)
         self.equBasicF = ttk.Frame(self.itemEditFrame)
@@ -1378,7 +1584,7 @@ class PvfeditequipmentframeWidget(ttk.Frame):
         self.editedTree.heading("3", text ="物品ID")
         _ = self.editedTree.insert('',tk.END,values=[])
         self.editedTree.delete(_)
-        self.equTypeE.config(values=list(SegKeyDict['equipment'].keys()))
+        self.equTypeE.config(values=list(SegKeyDict.get('equipment',{}).keys()))
         useableJobValues = [
             "[all]",
             "[swordman]",
@@ -1529,6 +1735,16 @@ class PvfeditequipmentframeWidget(ttk.Frame):
     def enable_Btns(self):
         self.editThisBtn.config(state='normal')
         #self.copyThisBtn.config(state='normal')
+
+    def pick_Search_Item(self,itemID):
+        """搜索结果选中后填入 ID 框并载入字段（未加载 PVF 时只填 ID）"""
+        self.searchNameE.config(values=[])
+        self.searchNameE.delete(0,tk.END)
+        self.searchNameE.insert(0,str(cacheM.ITEMS_dict.get(itemID)))
+        self.idE.delete(0,tk.END)
+        self.idE.insert(0,itemID)
+        if self.pvf is not None:
+            self.btn_edit_file()
 
     def btn_edit_file(self):
         try:
@@ -1681,7 +1897,10 @@ class PvfeditequipmentframeWidget(ttk.Frame):
                 self.searchNameE.config(values=[str([item[0]])+' '+item[1] for item in res])
 
 class PvfeditmainframeApp:
-    def __init__(self, master=None):
+    def __init__(self, master=None, onSubmitBag=None, onSubmitMail=None, logFunc=None):
+        self.onSubmitBag = onSubmitBag
+        self.onSubmitMail = onSubmitMail
+        self.logFunc = logFunc    # 日志转发到主程序（None 时打印）
         # build ui
         frame1 = ttk.Frame(master)
         frame1.configure(height=600, width=800)
@@ -1700,47 +1919,20 @@ class PvfeditmainframeApp:
             command=self.resave_PVF_edit,
             label='另存编辑')
         self.fileMenu.add("separator")
-        self.fileMenu.add("command", command=self.open_PVF, label='加载PVF')
         self.fileMenu.add("command", command=self.export_PVF, label='导出PVF')
         menubutton1.configure(menu=self.fileMenu)
         menubutton1.pack(side="left")
-        menubutton2 = ttk.Menubutton(self.openPVFFrame)
-        menubutton2.configure(state="disabled", text='编辑')
-        self.editMenu = tk.Menu(menubutton2)
-        menubutton2.configure(menu=self.editMenu)
-        menubutton2.pack(side="left")
-        label1 = ttk.Label(self.openPVFFrame)
-        label1.pack(side="left")
-        self.PVFE = ttk.Combobox(self.openPVFFrame)
-        self.PVFE.configure(state="readonly")
-        self.PVFE.pack(expand="true", fill="x", side="left")
-        self.openPVGBtn = ttk.Button(self.openPVFFrame)
-        self.openPVGBtn.configure(text='打开PVF')
-        self.openPVGBtn.pack(side="left")
-        self.openPVGBtn.configure(command=self.open_PVF)
         self.exportPVFBtn = ttk.Button(self.openPVFFrame)
         self.exportPVFBtn.configure(text='导出PVF')
         self.exportPVFBtn.pack(side="left")
         self.exportPVFBtn.configure(command=self.export_PVF)
-        self.encodeE = ttk.Combobox(self.openPVFFrame)
-        self.encodeE.configure(state="readonly", values='big5 gbk utf-8')
-        self.encodeE.pack(side="left")
         self.openPVFFrame.pack(fill="x", side="top")
         separator1 = ttk.Separator(frame1)
         separator1.configure(orient="horizontal")
         separator1.pack(expand="false", fill="x", side="top")
         self.tabView = ttk.Notebook(frame1)
-        self.tabView.configure(height=550, width=1000)
+        self.tabView.configure(height=680, width=1320)
         self.tabView.pack(expand="true", fill="both", side="top")
-        labelframe1 = ttk.Labelframe(frame1)
-        labelframe1.configure(height=200, text='事件日志', width=800)
-        self.logBar = ttk.Scrollbar(labelframe1)
-        self.logBar.configure(orient="vertical")
-        self.logBar.pack(fill="y", side="right")
-        self.logE = tk.Text(labelframe1)
-        self.logE.configure(height=15, takefocus=False, width=50)
-        self.logE.pack(expand="true", fill="both", side="left")
-        labelframe1.pack(fill="x", side="top")
         frame1.pack(expand="true", fill="both", side="top")
 
 
@@ -1749,20 +1941,33 @@ class PvfeditmainframeApp:
         self.mainwindow = frame1
         self.root = master
         self._other_build_functions()
+        # 背包编辑器已加载 PVF 时直接共用，避免重复导入
+        sharedPVF = str(cacheM.PVFcacheDict.get('pvfPath') or '')
+        if sharedPVF != '' and Path(sharedPVF).exists():
+            self.log('共用背包编辑器已加载的 PVF：%s' % sharedPVF)
+            self.open_PVF()
 
     def run(self):
         
         self.mainwindow.mainloop()
     
+    def select_Tab(self,tabName):
+        """按标签名切换（背包工具'道具搜索/装备搜索'按钮打开时用）"""
+        for tabID in self.tabView.tabs():
+            if self.tabView.tab(tabID,'text').strip() == tabName:
+                self.tabView.select(tabID)
+                return True
+        return False
+
     def _other_build_functions(self):
         def _build_stk_tab():
-            widget = PvfeditstackableframeWidget(self.tabView)
+            widget = PvfeditstackableframeWidget(self.tabView,onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail)
             widget.pack(expand=True, fill="both")
             self.tabView.add(widget,text=' 道具 ')
             widget.log = self.log
             return widget
         def _build_equ_tab():
-            widget = PvfeditequipmentframeWidget(self.tabView)
+            widget = PvfeditequipmentframeWidget(self.tabView,onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail)
             widget.pack(expand=True, fill="both")
             self.tabView.add(widget,text=' 装备 ')
             widget.log = self.log
@@ -1787,10 +1992,6 @@ class PvfeditmainframeApp:
         self.sklTab = _build_skill_tab()
         self.etcTab = _build_etc_tab()
         self.itemTabList = [self.stkTab, self.equTab, self.etcTab, self.sklTab]
-        self.logBar.config(command =self.logE.yview)
-        self.logE.config(yscrollcommand=self.logBar.set)
-        self.encodeE.set('big5')
-        CreateToolTip(self.encodeE,'文件编码，当乱码时切换编码重新加载')
         bind_command(self.root,"<Control_L><o>", lambda e:self.open_PVF_edit())
         bind_command(self.root,"<Control_L><s>", lambda e:self.save_PVF_edit())
         bind_command(self.root,"<Control_R><o>", lambda e:self.open_PVF())
@@ -1798,16 +1999,17 @@ class PvfeditmainframeApp:
     
     def open_PVF(self):
         def inner():
-            PVF = askopenfilename(filetypes=[('DNF Script.pvf file','*.pvf')])
+            # 同进程复用背包编辑器已加载的 PVF：路径与编码都沿用缓存，避免重复导入
+            PVF = str(cacheM.PVFcacheDict.get('pvfPath') or '')
+            if PVF == '' or not Path(PVF).exists():
+                PVF = askopenfilename(filetypes=[('DNF Script.pvf file','*.pvf')])
+            enc = cacheM.PVFcacheDict.get('encode') or 'big5'
             p = Path(PVF)
             if PVF!='' and p.exists():
                 self.log(PVF)
                 cacheM.PVFClass = TinyPVFEditor
-                #print(self.encodeE.get())
-                pvf:TinyPVFEditor = cacheM.loadItems2(True,PVF,retType='pvf',encode=self.encodeE.get())
-                self.pvf = pvf 
-                self.PVFE.delete(0,tk.END)
-                self.PVFE.insert(0,p)
+                pvf:TinyPVFEditor = cacheM.loadItems2(True,PVF,retType='pvf',encode=enc)
+                self.pvf = pvf
                 stkLstPath = 'stackable/stackable.lst'
                 self.lstDict['stackable'] = LstEditor(pvf.read_File_In_Decrypted_Bin(stkLstPath),pvf.stringTable,baseDir='stackable',suffix='.stk')
                 self.stkTab.lst = self.lstDict['stackable']
@@ -1942,7 +2144,7 @@ class PvfeditmainframeApp:
             except Exception as e:
                 self.log(f'文件保存失败 {e}')
         t = threading.Thread(target=inner)
-        t.setDaemon(True)
+        t.daemon = True
         t.start()
 
 
@@ -1952,16 +2154,17 @@ class PvfeditmainframeApp:
 
 
     def log(self,info='',*args):
-        tm = time.localtime()
+        '''日志统一记到主程序（背包编辑器）窗口下方的全局日志'''
         infos = [info]
         infos.extend(args)
         for info in infos:
-            for info in str(info).split('\n'):
+            for info in str(info).splitlines():
                 if info.strip()=='':
                     continue
-                log = f'[{"%02d" % tm.tm_mon}-{"%02d" % tm.tm_mday} {"%02d" % tm.tm_hour}:{"%02d" % tm.tm_min}:{"%02d" % tm.tm_sec}] {info}\n'
-                self.logE.insert(tk.END,log)
-                self.logE.see(tk.END)
+                if self.logFunc is not None:
+                    self.logFunc(info)
+                else:
+                    print(info)
 
 
 

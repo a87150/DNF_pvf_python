@@ -43,7 +43,7 @@ def print(*args,**kw):
 def inThread(func):
     def inner(*args,**kw):
         t = threading.Thread(target=lambda:func(*args,**kw))
-        t.setDaemon(True)
+        t.daemon = True
         t.start()
         return t
     return inner
@@ -208,14 +208,6 @@ def unpackBLOB_Item(fbytes):
         result = []
     return result
 
-def buildDeletedBlob2(deleteList,originBlob):
-    '''返回删除物品后的数据库blob字段'''
-    prefix = originBlob[:4]
-    items_bytes = bytearray(zlib.decompress(originBlob[4:]))
-    for i in deleteList:
-        items_bytes[i*61:i*61+61] = bytearray(b'\x00'*61)
-    blob = prefix + zlib.compress(items_bytes)
-    return blob
 
 def buildBlob(originBlob,editedDnfItemSlotList):
     '''传入原始blob字段和需要修改的位置列表[ [1, DnfItemGrid对象], ... ]'''
@@ -397,48 +389,20 @@ def getUID(username=''):
 
 
 
-def decode_charac_list_old(characList:list):
-    global sqlEncodeUseIndex
-    res_new = []
-    if ENCODE_AUTO==True:
-        sqlEncodeUseIndex = 0
-        while sqlEncodeUseIndex < len(SQL_ENCODE_LIST):
-            res_new = []
-            #print(f'当前编码：{SQL_ENCODE_LIST[sqlEncodeUseIndex]}')
-            for i in characList:
-                record = list(i)
-                try:
-                    record[1] = record[1].encode(SQL_ENCODE_LIST[sqlEncodeUseIndex]).decode('utf-8')
-                    res_new.append(record)
-                except:
-                    
-                    if sqlEncodeUseIndex +1 < len(SQL_ENCODE_LIST):
-                        sqlEncodeUseIndex += 1
-                        
-                        break
-                    else:
-                        record[1] = record[1].encode(SQL_ENCODE_LIST[sqlEncodeUseIndex],errors='replace').decode('utf-8',errors='replace')
-                        res_new.append(record)
-            if len(res_new) == len(characList):
-                break
-    else:
-        for i in characList:
-            record = list(i)
-            print(record)
-            record[1] = record[1].encode(SQL_ENCODE_LIST[sqlEncodeUseIndex],errors='replace').decode('utf-8',errors='replace')
-            res_new.append(record)
-    print(SQL_ENCODE_LIST[sqlEncodeUseIndex])
-    return res_new
 def decode(string:str):
-    s1 = string.encode('latin1','replace')
-    s2 = string.encode('cp1252','replace')
-    s3 = b''
-    for i in range(len(s1)):
-        if s1[i:i+1] == b'?':
-            s3 += s2[i:i+1]
-        else:
-            s3 += s1[i:i+1]
-    return s3.decode(errors='replace')
+    #把数据库取回的 latin1/cp1252 形态还原成正常汉字。
+    #关键：已经是正常 unicode 时下面两个编码都会失败 → 原样返回。
+    #以前这里用 errors='replace'，正常汉字会被编成 '?'，界面再保存就把 '?' 写回库，角色名就是这样烂掉的
+    for codec in ('cp1252','latin1'):
+        try:
+            raw = string.encode(codec)
+        except UnicodeEncodeError:
+            continue
+        try:
+            return raw.decode('utf-8')
+        except UnicodeDecodeError:
+            continue
+    return string   #认不出来就保持原样：宁可显示乱码，也不把库里的数据改坏
 def decode_charac_list(characList:list):
     
     global sqlEncodeUseIndex
@@ -453,7 +417,10 @@ def decode_charac_list(characList:list):
         for i in characList:
             record = list(i)
             #print(record)
-            record[2] = record[2].encode(SQL_ENCODE_LIST[sqlEncodeUseIndex],errors='replace').decode('utf-8',errors='replace')
+            try:
+                record[2] = record[2].encode(SQL_ENCODE_LIST[sqlEncodeUseIndex]).decode('utf-8')
+            except Exception:
+                pass   #这个编码表示不了就原样保留，不用 errors='replace' 把汉字写成 '?'
             res_new.append(record)
     #print(SQL_ENCODE_LIST[sqlEncodeUseIndex])
     return res_new
@@ -489,16 +456,18 @@ def getCharacterInfo(cName='',uid=0,cNo=0):
 
 
 def getCharactorNo(cName):
-    name_new = cName.encode('utf-8').decode(SQL_ENCODE_LIST[sqlEncodeUseIndex])
-    sql = f"select charac_no from charac_info where charac_name='{name_new}';"
-    res = execute_and_fetch('taiwan_cain',sql)
+    #和 getCharacterInfo 同一套办法：utf-8 字节按参数传进去，两种连接字符集各查一次。
+    #原来用 .decode(SQL_ENCODE_LIST[...]) 拼串，而默认索引 0 是 '混合'（不是编码名）→ 直接 LookupError
+    sql = "select charac_no from charac_info where charac_name=%s;"
+    name_new = cName.encode('utf-8','replace')
+    res = list(execute_and_fetch('taiwan_cain',sql,(name_new,),'latin1'))
+    res.extend(execute_and_fetch('taiwan_cain',sql,(name_new,),'utf-8'))
 
     name_tw = convert(cName,'zh-tw')
     if cName!=name_tw:
-        name_tw_new = name_tw.encode('utf-8').decode(SQL_ENCODE_LIST[sqlEncodeUseIndex])
-        sql = f"select charac_no from charac_info where charac_name='{name_tw_new}';"
-        res_tmp = execute_and_fetch('taiwan_cain',sql)
-        res.extend(res_tmp)
+        name_tw_new = name_tw.encode('utf-8','replace')
+        res.extend(execute_and_fetch('taiwan_cain',sql,(name_tw_new,),'latin1'))
+        res.extend(execute_and_fetch('taiwan_cain',sql,(name_tw_new,),'utf-8'))
     return res
 
 def getCargoAll(cName='',cNo=0):
@@ -1413,7 +1382,7 @@ def connect(infoFunc=lambda x:...,conn=None): #多线程连接
                 print(f'连接失败，{str(connector_)}, {e}')
 
     t = threading.Thread(target=innerThread)
-    t.setDaemon(True)
+    t.daemon = True
     t.start()
     t.join()
     if len(connectorAvailuableList)==0:

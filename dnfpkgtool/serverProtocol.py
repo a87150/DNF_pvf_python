@@ -24,253 +24,6 @@ logFunc = [oldPrint]
 def print(*args,**kw):
     logFunc[-1](*args,**kw)
 
-ipMap = {}
-class SSHServerProtocol:
-    def __init__(self,app,ip,port,user,pwd='',keyPath=''):
-        self.master = app
-        self.app = app
-        self.ip = ip
-        self.port = port
-        self.user = user
-        self.pwd = pwd
-        self.keyPath = keyPath
-        self.connectingFlg = False
-        self.connectedFlg = False
-        self.startingFlg = False
-        self.ssh = paramiko.SSHClient
-        self.connect()
-
-    def connect(self):
-        def inner():
-            if self.connectedFlg:
-                try:
-                    self.ssh.close()
-                    self.transPort.close()
-                except:
-                    pass
-            ip = self.ip
-            port = int(self.port)
-            user = self.user
-            self.connectingFlg = True
-            ip = ipMap.get(ip,ip)   #用于IP转换
-            if self.keyPath!='':
-                if os.path.exists(self.keyPath):
-                    try:
-                        private_key  = paramiko.RSAKey.from_private_key_file(self.keyPath)
-                    except Exception as e:
-                        messagebox.showerror('错误',f'密钥文件读取错误{e}')
-                        return False
-                    try:
-                        ssh.connect(ip, username=user, port=port, pkey=private_key,timeout=3)
-                        self.transPort = paramiko.Transport((ip,port))
-                        self.transPort.connect(username=user, pkey=private_key)
-                    except Exception as e:
-                        print(f'SSH密钥连接失败 {e}')
-                        self.connectedFlg = False
-                        self.connectingFlg = False
-                        return False
-                    cacheM.config['SERVER_PWD'] = ''
-                else:
-                    messagebox.showerror('错误',f'密钥文件[{self.keyPath}]不存在')
-                    return False
-            else:
-                pwd = self.pwd
-                try:
-                    ssh.connect(ip, username=user, port=port, password=pwd,timeout=3)
-                    self.transPort = paramiko.Transport((ip,port))
-                    self.transPort.connect(username=user, password=pwd)
-                    
-                except Exception as e:
-                    print(f'SSH连接失败 {e}')
-                    self.connectedFlg = False
-                    self.connectingFlg = False
-                    return False
-                cacheM.config['SERVER_PWD'] = pwd
-            cacheM.config['SERVER_IP'] = ip
-            cacheM.config['SERVER_PORT'] = port
-            cacheM.config['SERVER_USER'] = user
-            cacheM.config['SERVER_CONFIGS'][ip] = {'port':port,'pwd':pwd,'user':user,'keyPath':self.keyPath}
-            cacheM.save_config()
-            self.connectedFlg = True
-            print('服务器已连接！')
-            self.connectingFlg = False
-
-        self.connectingFlg = False
-        self.connectedFlg = False
-        self.ssh = paramiko.SSHClient()
-        ssh = self.ssh
-        self.transPort = paramiko.Transport
-        # 允许连接不在know_hosts文件中的主机
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-        inner()  
-
-    def run_file(self,fileName):
-        def inner():
-            ssh_stdin, ssh_stdout, ssh_stderr = self.ssh.exec_command(f'sh "/root/{fileName}"')
-            while True:
-                res = ssh_stdout.readline()
-                if res == '':
-                    break
-                time.sleep(0.001)
-                print(res)
-            print(f'{fileName}执行完毕')
-        t = threading.Thread(target=inner)
-        t.setDaemon(True)
-        t.start()
-
-    def run_cmd(self,cmd='ls',endStr=None):
-        def inner():
-            ssh_stdin, ssh_stdout, ssh_stderr = self.ssh.exec_command(cmd)
-            t = 0
-            while True:
-                try:
-                    res = ssh_stdout.readline()
-                    if res.replace('\n','') == '':
-                        t += 1
-                        if t==10: break
-                    else:
-                        t = 0
-                        if endStr is not None and endStr in res:
-                            break
-                        print(res.replace('\n',''))
-                    time.sleep(0.02)
-                except:
-                    break
-            #self.title(f'指令执行完毕')
-            print(f'指令执行完毕')
-            #time.sleep(60)
-
-        t = threading.Thread(target=inner)
-        t.setDaemon(True)
-        t.start()
-        return t
-
-    def run_cmd2(self,cmd='ls'):
-        def inner():
-            chan = self.ssh.invoke_shell()
-            chan.send(cmd + '\n')
-            buff = ''
-            while not buff.endswith('#'):
-                resp = chan.recv(1024)
-                buff += resp.decode('utf-8',errors='replace')
-                print(resp)
-
-        t = threading.Thread(target=inner)
-        t.setDaemon(True)
-        t.start()
-        return t
-    
-    def uploadFile(self):
-        def inner():
-            def printTotals(transferred, toBeTransferred):
-                nonlocal time_now
-                if time.time() - time_now>1:
-                    print("Transferred: {0}\tOut of: {1}".format(transferred, toBeTransferred))
-                    print("%.3fM/%.3fM" % (transferred/1e6, toBeTransferred/1e6))
-                    time_now += 1
-
-            pvfPath = askopenfilename(filetypes=[('DNF Script.pvf file','*.pvf')])                
-            if pvfPath=='' or not Path(pvfPath).exists():
-                print('文件错误')
-                return False
-            print(pvfPath)
-            sftp = paramiko.SFTPClient.from_transport(self.transPort)
-            remote_path = r'/home/neople/game/Script.pvf'
-            cmd = r'ls /home/neople/game/'
-            ssh_stdin, ssh_stdout, ssh_stderr = self.ssh.exec_command(cmd)
-            res = ssh_stdout.readlines()
-            #print(res)
-            if len(res)<5:
-                print('目标文件夹异常')
-                return False
-            time_now = time.time()
-            sftp.put(pvfPath,remote_path,callback=printTotals)
-            print('上传完成！')
-            upPatch = messagebox.askokcancel('上传完成，是否上传等级补丁？')
-            if upPatch:
-                remote_path = r'/home/neople/game/df_game_r'
-                patchPath = askopenfilename()    
-                if patchPath=='':
-                    print('补丁文件错误')
-                    return False
-                sftp.put(patchPath,remote_path,callback=printTotals)
-        t = threading.Thread(target=inner)
-        t.start()
-
-    def lsDir(self,dirPath='/'):
-        ssh_stdin, ssh_stdout, ssh_stderr = self.ssh.exec_command(f"ls {dirPath}")
-        files = [item.strip() for item in ssh_stdout.readlines()]
-        return files
-
-    def downloadFile(self,filePath='',targetPath='',progressBarPos=[200,200],progressBarMaster=None):
-        def showProgress(transferred, toBeTransferred):
-            #print(transferred,toBeTransferred)
-            nonlocal time_now
-            if time.time() - time_now>1:
-                progressBar['maximum'] = toBeTransferred
-                # 进度值初始值
-                progressBar['value'] = transferred
-                progressBar.update()
-                time_now += 0.1
-
-        # 使用paramiko下载文件到本机
-        if progressBarMaster is None:
-            progressBarMaster = self.master
-        progressWin = tk.Toplevel(progressBarMaster)
-        progressWin.geometry(f"+{progressBarPos[0]}+{progressBarPos[1]}")
-        progressWin.overrideredirect(True)
-        progressWin.focus_force()
-        progressBar = ttk.Progressbar(progressWin)
-        progressBar.pack()
-        time_now = time.time()
-        try:
-            sftp = paramiko.SFTPClient.from_transport(self.transPort)
-            sftp.get(filePath, targetPath,callback=showProgress)
-        except:
-            progressWin.destroy()
-            return False
-        progressWin.destroy()
-        return True
-    
-    def run_server(self):
-        def inner():
-            if self.startingFlg:
-                print('服务器正在启动中！请点击停止服务器')
-                return False
-            self.startingFlg = True
-            ssh_stdin, ssh_stdout, ssh_stderr = self.ssh.exec_command("sh /root/run")
-            print('DNF服务器启动中...')
-            while True:
-                res = ssh_stdout.readline()
-                if res == '':
-                    break
-                if 'Connect To Guild Server' in str(res):
-                    print('服务器启动完成')
-                    break
-                if 'success' in str(res).lower() or 'error' in str(res).lower() or 'fail' in str(res).lower():
-                    print(str(res).strip())
-            self.startingFlg = False
-            
-        t = threading.Thread(target=inner)
-        t.setDaemon(True)
-        t.start()
-
-    def stop_server(self):
-        def inner():
-            self.startingFlg = False
-            print('指令执行中...')
-            ssh_stdin, ssh_stdout, ssh_stderr = self.ssh.exec_command("sh /root/stop")
-            ssh_stdout.readlines()
-            ssh_stdin, ssh_stdout, ssh_stderr = self.ssh.exec_command("sh /root/stop")
-            ssh_stdout.readlines()
-            print('服务器已停止')
-        t = threading.Thread(target=inner)
-        t.setDaemon(True)
-        t.start()
-
-    def restart_channel(self):
-        self.run_file('run1')
 
         
     
@@ -341,7 +94,7 @@ class ServerCtrlFrame(tk.Frame):
                 self.title('服务器已连接！')
                 self.connectingFlg = False
             t = threading.Thread(target = inner)
-            t.setDaemon(True)
+            t.daemon = True
             t.start()        
         def run_server():
             def inner():
@@ -365,7 +118,7 @@ class ServerCtrlFrame(tk.Frame):
                 startingFlg = False
                 
             t = threading.Thread(target=inner)
-            t.setDaemon(True)
+            t.daemon = True
             t.start()
 
         def stop_server():
@@ -380,7 +133,7 @@ class ServerCtrlFrame(tk.Frame):
                 print('服务器已停止')
                 self.title('服务器已停止')
             t = threading.Thread(target=inner)
-            t.setDaemon(True)
+            t.daemon = True
             t.start()
 
         def restart_channel():
@@ -398,7 +151,7 @@ class ServerCtrlFrame(tk.Frame):
                 self.title(f'{fileName}执行完毕')
 
             t = threading.Thread(target=inner)
-            t.setDaemon(True)
+            t.daemon = True
             t.start()
 
         def run_cmd(cmd='ls',endStr=None):
@@ -425,7 +178,7 @@ class ServerCtrlFrame(tk.Frame):
                 #time.sleep(60)
 
             t = threading.Thread(target=inner)
-            t.setDaemon(True)
+            t.daemon = True
             t.start()
             return t
 
@@ -440,7 +193,7 @@ class ServerCtrlFrame(tk.Frame):
                     print(resp)
 
             t = threading.Thread(target=inner)
-            t.setDaemon(True)
+            t.daemon = True
             t.start()
             return t
 

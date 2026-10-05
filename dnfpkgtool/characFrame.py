@@ -1,13 +1,6 @@
 
 import tkinter as tk
 import tkinter.ttk as ttk
-if not hasattr(ttk,'Spinbox'):
-    class Spinbox(ttk.Entry):
-        def __init__(self, master=None, **kw):  #from_=0,to=99,
-            ttk.Entry.__init__(self, master, "ttk::spinbox", **kw)
-        def set(self, value):
-            self.tk.call(self._w, "set", value)
-    ttk.Spinbox = Spinbox
 
 class CharacframeWidget(ttk.Frame):
     def __init__(self, master=None, **kw):
@@ -118,9 +111,6 @@ class CharacframeWidget(ttk.Frame):
         self.characEntriesFrame.rowconfigure("all", weight=1)
         self.characEntriesFrame.columnconfigure(1, weight=1)
         frame2.pack(fill="x", side="top")
-        self.imageFrame = ttk.Frame(self)
-        self.imageFrame.configure(height=200, width=200)
-        self.imageFrame.pack(expand="true", fill="both", side="top")
         self.configure(height=200, width=200)
         self.pack(expand="true", fill="both", side="top")
 

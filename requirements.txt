@@ -1,8 +1,20 @@
-mysql-connector
-zhconv
-pymysql
-pyperclip
-pyqrcode
-paramiko
-ttkbootstrap
-pycrypto
+# DNF_pvf_python 依赖（Python 3.14 / Windows x64）
+# 不锁死补丁版本，只给下限 + 大版本上限。
+
+# --- 界面 ---
+ttkbootstrap>=1.10,<3
+Pillow>=10,<13
+pyperclip>=1.8,<2
+pyqrcode>=1.2,<2
+pypng>=0.20220715          # pyqrcode 输出 PNG 用
+jsoneditor>=1.6,<2         # PVF 高级编辑（浏览器 JSON 编辑器），3.14 实测可用
+
+# --- 数据 / 系统 ---
+PyMySQL==1.0.2  # 1.1+ 把 bytes 参数转义成 _binary X'..'，写汉字会变乱码，必须锁这个版本
+paramiko>=3.4,<6
+psutil>=5.9,<8
+zhconv>=1.4,<2
+
+# --- 登录网关 ---
+pycryptodome>=3.20,<4      # 替代已死的 pycrypto，仍是 Crypto.* 命名空间
+cryptography>=42,<51

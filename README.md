@@ -1,187 +1,175 @@
-# DNF_pvf_python
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/ico.png)
+# DNF 私服工具箱（背包 / PVF / GM）
 
-DNF台服pvf以及数据库背包blob字段读取。dnf背包清理工具。
+基于 [a87150/DNF_pvf_python](https://github.com/a87150/DNF_pvf_python.git) 的克隆版本，并完成一轮结构精简与兼容性升级：裁剪死代码约 4700 行，修复打包（PyInstaller）与汉字编码问题，调整界面布局。
 
-本工具用于编辑角色背包，搜索PVF物品，强制穿戴装备，时装潜能开启，时装删除宠物删除，武器强化锻造增幅，4词条魔法封印编辑，角色改名，角色转职觉醒，角色升级降级，以及自动查询替换PVF后导致的背包内炸角色物品。
+> 仅用于自建 DNF 私服的日常维护。本工具会直接读写线上数据库与 `Script.pvf`，操作前务必备份。
 
+## 一、项目简介
 
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/168.png)
- 
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/sponsor.png)
+面向 DNF 台服/私服的桌面工具箱，使用 Python + tkinter/ttkbootstrap 实现，直接操作服务端 MySQL：
 
-# 食用说明
+- 把角色背包、仓库等字段当作 **blob** 解析与重写（每件物品为 61 字节的 `DnfItemSlot` 结构）
+- 解析并编辑客户端资源 **`Script.pvf`**（背包编辑器与 PVF 编辑器共用同一份已加载的 PVF）
+- 提供邮件发送、角色属性修改、时装/宠物清理等 GM 能力
+- 附带一套自建登录网关（`pkgLogin/`）
 
-### 1、文件目录：
+## 二、功能列表
 
-解压文件包，除开可执行EXE文件，目录分别代表：
+| 模块 | 能力 |
+|---|---|
+| 角色背包编辑 | 解析 `charac_inven_expand` 等 blob 字段，可视化增删改物品、数量、强化/锻造/增幅数值 |
+| PVF 物品搜索与编辑 | 从 `Script.pvf` 读取物品库做关键字搜索，选中后直接提交到背包或邮件 |
+| 强制穿戴 | 忽略职业/等级/部位限制，把装备穿到目标角色 |
+| 时装 / 宠物删除 | 清理时装栏与宠物栏数据 |
+| 强化 / 锻造 / 增幅 | 批量设置装备的强化等级、锻造等级与增幅属性 |
+| 魔法封印 | 设置或清除魔法封印属性 |
+| 改名 / 转职 / 升级 | 修改角色名、职业、等级等基础属性 |
+| 炸背包物品清理 | 删除背包中异常、重复或溢出的物品槽位 |
+| PVF 编辑器 | 解析 `Script.pvf`，支持搜索、编辑与导出（共用背包编辑器已加载的 PVF，不重复导入） |
+| 邮件发送 | 文本邮件、带道具邮件，以及群发 / 在线 / 全体发送 |
 
-1、config配置文件，里面有github图片、首页和角色信息页的图片、魔法封印、物品信息、职业信息以及本地pvf读取缓存；
+## 三、环境要求
 
-2、log日志文件，可以存储软件执行过程中的一部分日志；
+- **操作系统**：Windows（界面依赖 tkinter，DPI 缩放走 Windows API）
+- **Python**：3.14（已在 CPython 3.14.7 验证）
+- **依赖**：见 [requirements.txt](requirements.txt)
+- **数据库**：可访问的服务端 MySQL，地址、账号、端口保存在 [config/config.json](config/config.json)
 
-3、python源代码及执行环境，里面有完整的python运行开发环境，如果有需求且有一定的代码能力，可以直接编写文件夹内的GUI.py修改程序。
+### PyMySQL 必须锁定 1.0.2
 
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/52.png)
+```bash
+pip install "PyMySQL==1.0.2"
+```
 
+PyMySQL **1.1 及以上**会把 `bytes` 型参数转义为 `_binary X'...'`，而 1.0.2 转义为 `'...'`（按连接字符集解释）。邮件正文等汉字内容是以 `bytes` 传入的，两者落到数据库里的字节完全不同 —— 使用高版本会导致游戏内显示乱码，且**与界面上的编码选项无关**。因此 [requirements.txt](requirements.txt) 中已固定：
 
+```text
+PyMySQL==1.0.2
+```
 
-### 2、数据库连接与角色搜索
+## 四、运行与打包
 
-软件运行后，上方为数据库连接信息。点击链接后至多会有3个连接器实现对数据库的连接。
+### 4.1 源码运行
 
-当一个连接器都连不上时，会提示数据库连接失败。
+```bash
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe main.py
+```
 
-当角色列表出现乱码等问题时，可以通过切换连接器和修改编码来调整。默认会自动选择一个能够正常解码的选项。
+[main.py](main.py) 作为入口承担三件事：把工作目录切到脚本所在目录、首次运行时把内置 `config/` 复制到程序旁边（打包后便于持久化配置）、调用 `multiprocessing.freeze_support()`。另提供 PVF 加载自检开关：
 
-当编码不能正常解析时，修改角色信息可能会导致角色名错误，在游戏内使用改名卡即可。
+```bash
+.venv\Scripts\python.exe main.py --loadpvf D:\Script.pvf
+```
 
+结果写入工作目录下的 `log/`。
 
-#### 数据来源
+### 4.2 打包为单文件 exe
 
-读取本地CSV或者PVF文件来作为数据参考。
+```powershell
+.venv\Scripts\python.exe -m PyInstaller --noconfirm --clean --onefile --windowed `
+  --runtime-tmpdir . `
+  --name DNF背包编辑工具 `
+  --add-data "config;config" `
+  --collect-all ttkbootstrap --collect-all jsoneditor --collect-all zhconv `
+  --exclude-module matplotlib --exclude-module numpy `
+  main.py
+```
 
-CSV提取自台服dnf吧一键端（2022）。
+产物为 `dist/DNF背包编辑工具.exe`（约 33.8 MB），运行后在同级目录生成 `config/` 与 `log/`。
 
-当没有加载PVF时，无法使用道具专用搜索和装备专用搜索。
+### 4.3 打包参数逐条说明
 
-PVF文件读取后会在config目录创建本地缓存pvf.cache，不同的PVF根据MD5值加以区分，同一个PVF在不同目录也是不会重复读取的。
+| 参数 / 代码 | 为什么必需 |
+|---|---|
+| `--onefile --windowed` | 打成单个 exe，且不弹出控制台窗口 |
+| `--runtime-tmpdir .` | 单文件引导器默认解压到 `%TEMP%`；当 `%TEMP%` 不可写时会退回 `C:\Windows\Temp`，**非管理员账号写不进去**，启动即报 `Could not create temporary directory!`。指定在 exe 同级目录解压即可绕开 |
+| `main.py` 中的 `multiprocessing.freeze_support()` | PVF 解析使用 `multiprocessing.Pool` 多进程；冻结成 exe 后若不调用它，子进程无法创建，表现为**加载 PVF 一直无响应** |
+| `--collect-all zhconv` | `zhconv` 的 `zhcdict.json` 是运行时按路径读取的数据文件，静态分析收不到；缺失时加载 PVF（以及所有简繁转换）会抛 `FileNotFoundError: ...zhconv\zhcdict.json` |
+| `--add-data "config;config"` | 运行时需要 `config/` 下的配置、道具表、`b2e.exe` 等资源 |
+| `--collect-all ttkbootstrap` | 界面主题的资源文件 |
+| `--collect-all jsoneditor` | 物品属性 JSON 编辑器所需的前端资源 |
+| `--exclude-module matplotlib numpy` | 项目未使用这两个库，排除以缩小体积、加快启动 |
 
-读取后，可以通过最下方的选择框选择PVF。
- 
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/160.png)
+## 五、本轮升级改动清单
 
-### 3、物品编辑与备份
+### 5.1 结构精简
 
-在标签页“物品栏”、“穿戴栏”、“宠物栏”、“仓库”四个页面中，可以对所持有的物品进行详细编辑修改，也可使用导出字段/导入字段的方式保存对应数据到本地文件或将本地文件上传至服务端。
+- 删除无引用代码约 **4700 行**：多余的界面变体、重复的搜索窗口、旧驱动副本、无人调用的辅助模块与图片资源。
 
-当加载角色背包或修改背包内容时，会自动检测背包中是否有当前PVF所不能识别或者状态与PVF冲突的物品，并加以颜色区分标注。
-
-红色：与PVF冲突；
-
-黄色：物品种类未知或不存在该物品；
-
-灰色：编辑后删除的物品；
-
-蓝色：编辑过的物品。
-
-当选择为装备时，可以使用右侧编辑面板的所有功能，包括强化锻造、修改魔法封印等。
-
-此外，可以通过生成字节，复制字节后粘贴到别的位置导入的方式复制物品，也可以用这个方法强制穿戴角色本身无法穿戴的装备。
-
-可以通过右键进行快捷编辑。
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/161.png)
-
-### 4、高级搜索
-
-道具高级搜索和装备高级搜索。
-
-可以通过名称、PVF文本、物品分类对道具和装备进行详细搜索。
-
-可以使用空格分隔多个关键词配合模糊来对物品信息搜索。
-
-例如开启模糊搜索+关键词 “冷却减 出血” 表示同时存在 “冷xx却xx减” 和 “出xx血”的物品；
-
-关闭模糊搜索，指代同时存在 “冷却减” 和 “出血”的物品。
-
-选中搜索PVF文本，会同时搜索所有物品的PVF信息，否则只对物品名进行搜索。
-
-搜索完成后选中结果可以显示物品的PVF信息，点击提交可以直接将搜索结果填充至当前页面的物品编辑栏中。
- 
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/55.png)
-
- 
-
-### 5、时装宠物邮件任务
-
-宠物和邮件可以删除和发送，时装可以开启时装潜能。选项可以通过按住ctrl或shift进行多选，支持左右键拖拽来添加删除。
-
-删除与修改前会提示是否确定进行操作。
-
-任务可以一键完成击杀怪物、通关副本等类型任务。
- 
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/169.png)
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/170.png)
-
-
- 
-### 6、角色信息编辑&GM工具
-
-可以升级降级，可以改名，可以转职觉醒，可以充值封号。
-
-改名成功与否取决于数据库是否出现重名问题，以及数据库是否能够正确识别编码。
-
-当名称超过长度（20字节）则会自动裁剪。
-
-可以在名字前面加空格，但是后面加的空格会被去除。
-
-
-
-右侧点击是我的GitHub项目主页，有条件的朋友帮忙点个星星，二次开发的朋友务必点个叉子，每一份的支持都是免费开源软件继续发展的动力。
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/163.png)
-
-
-
-### 7、旧GM工具
-
-（已弃用）基本的GM工具集，可以充值点数、发送邮件、开关活动和服务器的一键启动停止，支持自定义指令执行。
-
-在加载PVF后，邮件可自动区分宠物邮件时装邮件。
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/03.png)
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/04.png)
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/05.png)
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/06.png)
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/07.png)
-
-### 8、封停账号
-
-便捷地对帐号进行封禁和解封，默认封禁时间为一年。
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/164.png)
-
-### 9、角色移动
-
-可以删除、回复角色，可以将角色移动到另一个账号中。
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/165.png)
-
-### 10、其他选项
-
-左侧为额外功能区，一键启动器可以在登陆游戏的情况下自动生成，之后使用启动器可以不用输入账号密码直接进入游戏；PVF缓存编辑器可以对已经缓存的PVF缓存进行编辑或数据导出，本脚本使用的CSV也可使用该功能导出。
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/166.png)
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/74.png)
-
-### 11、数据库
-可以对数据库进行备份和恢复，支持5.7和8.0版本的mysql进行跨版本恢复。
-
-也可以进行清档。
-
-用户管理页可以修改数据库密码，增添账号等功能。
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/167.png)
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/171.png)
-
-### 12、PVF工具
-
-可简单对PVF进行修改，例如道具属性、装备属性和整体爆率。
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/111.png)
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/112.png)
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/113.png)
-
-![Image text](https://github.com/Zageku/DNF_pvf_python/raw/main/images/114.png)
-
-
+### 5.2 汉字编码三连修
+
+| 改动 | 动机 |
+|---|---|
+| `PyMySQL` 锁定 1.0.2 | 1.1 及以上版本的 `_binary X'..'` 转义改变了落库字节，导致游戏内邮件汉字乱码 |
+| `decode()` 无损化（[sqlManager2.py](dnfpkgtool/sqlManager2.py)） | 原实现用 `encode('latin1','replace')` 处理数据库取回的字符；当记录是由 `utf-8` 连接取回的**正常 Unicode** 名字时，汉字会被整体替换成 `?`，界面显示问号，一旦保存就把 `?` 真正写进数据库 |
+| `getCharactorNo()` 参数化 | 原实现把 `SQL_ENCODE_LIST` 的默认项 `'混合'`（并非编码名）当作编码传给 `.decode()`，命中即 `LookupError`；且用字符串拼接构造 SQL。改为按参数传 `bytes`，并分别在 `latin1` 与 `utf-8` 两种连接字符集下查询，与同文件的 `getCharacterInfo()` 保持一致 |
+
+### 5.3 界面调整
+
+- **主窗口默认放大**：读取 `RESOLUTION` 配置后抬到不低于 1200×800，且不超过屏幕可用区域。
+- **全局事件日志下移**：事件日志区移动到主界面底部，固定 12 行并放大字号，统一记录全局信息（PVF 加载、数据库连接、邮件发送等）。
+- **PVF 编辑器瘦身**：移除独立的 PVF 加载框、编码选择框与内置日志面板，界面只保留修改与导出相关操作。
+- **搜索功能合并**：原先重复的"专用搜索"入口合并进统一的物品搜索面板。
+
+### 5.4 交互与入口
+
+- 启动时的广告弹窗改为**提示 PVF 文件位置**：`/home/neople/game/Script.pvf` —— 需先从服务器把 `Script.pvf` 下载到本机再打开。
+- 删除**失效的旧 GM 工具入口**：其引用的对象从未被赋值，点击必然抛错，属于无功能入口。
+
+## 六、常见问题（Q&A）
+
+**Q1：游戏里收到的邮件，汉字全变成乱码？**
+A：MySQL 驱动版本问题。PyMySQL ≥ 1.1 会把 `bytes` 参数转义为 `_binary X'..'`，与 1.0.2 的 `'...'` 在数据库端的解释方式不同，落库字节因此改变。执行 `pip install "PyMySQL==1.0.2"`（本项目已锁定）后重新打包即可。
+
+**Q2：加载 PVF 报 `FileNotFoundError: ...\zhconv\zhcdict.json`？**
+A：打包时漏掉了 `zhconv` 的数据文件。打包命令加上 `--collect-all zhconv`。
+
+**Q3：非管理员身份运行 exe 报 `Could not create temporary directory!`？**
+A：单文件引导器需要一个可写的解压目录，而「混合」自动探测无法解决权限问题。打包时加 `--runtime-tmpdir .`，并确保 exe 位于**当前用户可写**的目录（不要放在 `Program Files` 等受保护路径）。
+
+**Q4：打包后双击 exe，加载 PVF 一直无响应（既不报错也不结束）？**
+A：缺少 `multiprocessing.freeze_support()`。PVF 解析使用多进程，冻结后必须先调用它再进入主逻辑（[main.py](main.py) 已内置）。
+
+**Q5：界面和日志区域太小？**
+A：窗口尺寸取自配置 `RESOLUTION`，会被抬到不低于 1200×800；事件日志区固定 12 行并放大字号。屏幕分辨率较低时会自动限制在屏幕可用区域内。
+
+**Q6：修改界面上的"角色显示及编码"后，邮件文字仍然乱码？**
+A：该选项只影响读取角色名时的解码显示；邮件正文写入固定使用 `utf-8` 与 `latin1` 连接字符集，不经过该选项。
+
+**Q7：打包时报错或产物没更新？**
+A：先关闭正在运行的 exe。文件被占用时 PyInstaller 写不进目标文件，构建会失败或留下旧产物，请核对 exe 的时间戳与体积。
+
+## 七、目录结构
+
+```text
+dnf/
+├─ main.py                     入口：切工作目录、首次复制 config、freeze_support、PVF 自检开关
+├─ requirements.txt            依赖清单（PyMySQL 固定 1.0.2）
+├─ dnfpkgtool/                 主程序包
+│  ├─ __main__.py              主窗口与各功能页（背包、邮件、搜索……）
+│  ├─ sqlManager2.py           MySQL 读写层：物品 blob、编码转换、邮件写入
+│  ├─ cacheManager.py          PVF 缓存与配置读写
+│  ├─ pvfReader.py             PVF 解析（多进程）
+│  ├─ pvfEditor.py             PVF 数据模型与编辑
+│  ├─ pvfEditorGUI.py          PVF 编辑器界面
+│  ├─ itemSlotFrame.py         物品槽位界面
+│  ├─ characFrame.py           角色信息界面
+│  └─ ...                      其他功能帧与工具
+├─ pkgLogin/                   自建登录网关（客户端 / 服务端）
+├─ config/                     配置、道具 CSV、PVF 缓存、图标
+│  ├─ config.json              运行配置（数据库、界面等）
+│  └─ pvfCache/                PVF 解析缓存
+├─ tests/                      自检脚本（离线运行）
+├─ log/                        运行日志
+└─ dist/                       打包产物（exe + config/ + log/）
+```
+
+## 八、注意事项
+
+- **不要引用 `images/ico.png`**：图片资源已在本轮清理中删除。程序图标请使用 `config/DNF.ico` 或 `config/ico.ico`。
+- **仓库源文件是 CRLF 换行**：用脚本批量修改时，先以 `read_bytes()` 读出，把 `\r\n` 归一化为 `\n` 再做匹配替换，写回时把 `\n` 还原为 `\r\n`。直接对假定为 LF 的文本调用 `count()` 会匹配失败。
+- **配置会被程序覆盖保存**：`config/config.json` 在修改数据库或界面设置时由程序写回，调试前请先备份。
+- **直接操作线上数据**：本工具会真实写入数据库与 PVF 文件，请先备份 `taiwan_cain`、`taiwan_cain_2nd` 等相关库以及 `Script.pvf`。
+- **打包产物是便携的**：首次运行会把内置 `config/` 复制到 exe 同级目录，此后设置保存在该目录；删除整个文件夹即可完全卸载。
