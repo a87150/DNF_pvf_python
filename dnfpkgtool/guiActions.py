@@ -98,17 +98,24 @@ class GuiAppActions:
         itemEditFrame = getattr(self,'itemEditFrameDict',{}).get(tabName)
         if itemEditFrame is None:
             return False
+        itemSlot = sqlM.DnfItemSlot(b'\x00'*61)
+        itemSlot.id = itemID
+        itemSlot.type = 0x01
+        itemSlot.durability = 999
+        itemSlot.oriBytes = itemSlot.build_bytes()
         self.tabView.select(self.tabIDDict.get(' 背包 '))
         try:
+            #fillItemEditFrame：把这件物品的完整数据填进"修改物品"控件，改完再点提交才会写库
+            self.editFrameUpdateFuncs[tabName](itemSlot)
             itemEditFrame.itemIDEntry.config(state='normal')
             itemEditFrame.itemIDEntry.delete(0,tk.END)
             itemEditFrame.itemIDEntry.insert(0,itemID)
             itemEditFrame.itemNameEntry.delete(0,tk.END)
             itemEditFrame.itemNameEntry.insert(0,str(cacheM.ITEMS_dict.get(int(itemID),'')))
         except Exception as e:
-            log('载入修改失败：%r' % e)
+            log('载入物品数据失败：%r' % e)
             return False
-        log('搜索面板载入修改：物品[%s][%s]' % (cacheM.ITEMS_dict.get(int(itemID)),itemID))
+        log('搜索面板载入修改物品数据：物品[%s][%s]' % (cacheM.ITEMS_dict.get(int(itemID)),itemID))
         return True
 
 

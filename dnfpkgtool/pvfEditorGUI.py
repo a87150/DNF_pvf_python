@@ -469,8 +469,8 @@ class ItemSearchPanel(ttk.Labelframe):
         btnFrame = ttk.Frame(self)
         btnFrame.pack(fill='x',side='top',pady=2)
         ttk.Button(btnFrame,text='提交编辑',command=lambda:self._submit(self.onSubmitBag)).pack(expand=True,fill='x',side='left')
-        ttk.Button(btnFrame,text='载入修改',command=lambda:self._submit(self.onLoadEdit)).pack(expand=True,fill='x',side='left')
-        ttk.Button(btnFrame,text='提交邮件',command=lambda:self._submit(self.onSubmitMail)).pack(expand=True,fill='x',side='right')
+        ttk.Button(btnFrame,text='提交邮件',command=lambda:self._submit(self.onSubmitMail)).pack(expand=True,fill='x',side='left')
+        ttk.Button(btnFrame,text='修改物品数据',command=lambda:self._submit(self.onLoadEdit)).pack(expand=True,fill='x',side='left')
 
     def _load_Types(self):
         """分类候选延迟到真要用时再取（缓存与PVF数据是运行中才加载好的）"""

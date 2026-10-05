@@ -27,8 +27,9 @@ def texts(w, out=None):
     return out
 
 btns = texts(panel)
-check('搜索面板有"载入修改"按钮', '载入修改' in btns)
-check('原有按钮仍在(提交编辑/提交邮件)', '提交编辑' in btns and '提交邮件' in btns)
+check('搜索面板有"修改物品数据"按钮', '修改物品数据' in btns)
+check('三个按钮都在(提交编辑/提交邮件/修改物品数据)', all(t in btns for t in ('提交编辑', '提交邮件', '修改物品数据')))
+check('按钮顺序为 提交编辑->提交邮件->修改物品数据', [t for t in btns if t in ('提交编辑', '提交邮件', '修改物品数据')] == ['提交编辑', '提交邮件', '修改物品数据'])
 check('onLoadEdit 已保存', panel.onLoadEdit is not None)
 panel.selected_ID = lambda: 777          # 模拟选中结果
 panel._submit(panel.onLoadEdit)
