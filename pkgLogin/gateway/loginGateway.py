@@ -1,8 +1,7 @@
 # -*- coding:utf-8 -*-
 import socket
-import pymysql_new as pymysql
-from pymysql_new.cursors import Cursor
-import asyncio
+import pymysql
+from pymysql.cursors import Cursor
 from Crypto.PublicKey import RSA
 from Crypto.Signature import PKCS1_v1_5 as PKCS1_signature
 from Crypto.Cipher import PKCS1_v1_5 as PKCS1_cipher
@@ -60,7 +59,7 @@ print(f'服务器:{serverList[0]["name"]}')
 def inThread(func):
     def inner(*args,**kw):
         t = threading.Thread(target=lambda:func(*args,**kw))
-        t.setDaemon(True)
+        t.daemon = True
         t.start()
         return t
     return inner
@@ -179,15 +178,6 @@ def execute_commit(db,sql,args=None,charset='utf8',reConn=True):
     return False
 
 
-def execute_sql(db,sql,args=None,charset='utf8'):
-    taskID = genTaskID()#datetime.datetime.now().strftime('%Y%m%d%H%M%S%f') + str(random.randint(0,1000))
-    execute_queue.append((taskID,[db,sql,args,charset],'execute'))
-    while True:
-        if resDict.get(taskID) is not None:
-            res = resDict.pop(taskID)
-            return res
-        else:
-            time.sleep(0.005)
 
 def execute_and_fech(db,sql,args=None,charset='utf8'):
     taskID = genTaskID()#datetime.datetime.now().strftime('%Y%m%d%H%M%S%f') + str(random.randint(0,1000))
@@ -209,25 +199,16 @@ def execute_and_commit(db,sql,args=None,charset='utf8'):
         else:
             time.sleep(0.005)
 
-def commit_all():
-    for connector in connectorDict.values():
-        try:
-            connector.commit()
-        except:
-            pass
 
 db:pymysql.Connection = None
 cur:Cursor = None
 def connect_sql():
-    global db,cur, pymysql
+    global db,cur
     try:
         db = pymysql.connect(user=DB_USER, password=DB_PWD, host=DB_IP, port=DB_PORT, charset='utf8',connect_timeout=2)
         cur = db.cursor()
-    except:
-        import pymysql_old as pymysql
-        from pymysql_old.cursors import Cursor
-        db = pymysql.connect(user=DB_USER, password=DB_PWD, host=DB_IP, port=DB_PORT, charset='utf8',connect_timeout=2)
-        cur = db.cursor()
+    except Exception as e:
+        print(f'数据库连接失败: {e}')
     return True
 
 def loadPEM():
@@ -521,7 +502,7 @@ if __name__=='__main__':
                 pass
     print = log
     t = threading.Thread(target=logger)
-    t.setDaemon(True)
+    t.daemon = True
     t.start()
     connect_sql()
     serverStart()

@@ -167,6 +167,7 @@ rarityMap = {
     7:'神话',
     
 }
+rarityMapRev = {v: k for k, v in rarityMap.items()}
 
 formatedTypeMap = {
     1:'装备',
@@ -286,14 +287,6 @@ class PVFCacheManager:
             f.write(content)
         self.saveTinyCache()
 
-    def loadcache_old(self,MD5):
-        fileName = self.tinyCache.get(MD5)['fileName']
-        if fileName is not None:
-            filePath = cacheDirPath.joinpath(fileName)
-            with open(filePath,'rb') as f:
-                cacheCompressed = f.read()
-                PVFcacheDict:dict = pickle.loads(zlib.decompress(cacheCompressed))
-            return PVFcacheDict
     def loadcache2(self,MD5):
         fileName = self.tinyCache.get(MD5)['fileName']
         if fileName is not None:
@@ -306,22 +299,6 @@ class PVFCacheManager:
                 time.sleep(0.005)   #给主线程活动时间
             return PVFcacheDict
 
-    def saveCache_old(self,PVFcacheDict={}):
-        MD5 = PVFcacheDict.get('MD5')
-        newName = f'{MD5}.pvfcache'
-        fullPath = cacheDirPath.joinpath(newName)
-        PVFcacheDict['_cacheVersion'] = PVF_CACHE_VERSION
-        self.tinyCache[MD5] = {
-            'nickName':PVFcacheDict['nickName'],
-            'pvfPath':PVFcacheDict['pvfPath'],
-            'equNum':len(PVFcacheDict['equipment'].keys()),
-            'stkNum':len(PVFcacheDict['stackable'].keys()),
-            'fileName':newName,
-        }
-        content = zlib.compress(pickle.dumps(PVFcacheDict))        
-        with open(fullPath,'wb') as f:
-            f.write(content)
-        self.saveTinyCache()
 
     
     def __getitem__(self,MD5=''):
@@ -354,19 +331,7 @@ def save_PVF_cache(PVFcacheDict_=None):
     t = threading.Thread(target=inner)
     t.start()
 
-def get_rarity(itemID):
-    rarity = get_Item_Info_In_Dict(itemID).get('[rarity]')
-    if rarity is not None:
-        rarity = f'[{rarity[0]}]-{rarityMap.get(rarity[0])}'
-    return rarity
 
-def get_jobName(jobID,grow_type=0):
-    jobSubDict = jobDict.get(jobID)
-    if isinstance(jobSubDict,dict):
-        jobNew = jobSubDict.get(grow_type % 16)
-    else:
-        jobNew = grow_type % 16
-    return jobNew
 
 def getStackableTypeMainIdAndZh(itemID):
     '''返回物品种类ID和中文分类'''
@@ -414,11 +379,6 @@ def getStackableTypeMainIdAndZh(itemID):
         resTypeID = 0x00    #物品未被分类
     return resTypeID,resType
 
-def get_rarity(itemID):
-    rarity = get_Item_Info_In_Dict(itemID).get('[rarity]')
-    if rarity is not None:
-        rarity = f'[{rarity[0]}]-{rarityMap.get(rarity[0])}'
-    return rarity
 
 def get_quest_name(questID):
     questDict = PVFcacheDict.get('quest',{})
@@ -426,12 +386,15 @@ def get_quest_name(questID):
     #print(questID,questName)
     return questName
 
-def get_Quest_Info_In_Text(questID:int,cacheDict:dict=None):
-    resDict = PVFcacheDict.get('quest',{}).get(questID,{})
-    #print(resDict)
-    res = pvfReader.TinyPVF.dictSegment2text(resDict)
-    return res
 
+
+def get_lev_rarity(fileInDict: dict):
+    '''从PVF字段字典取出 (使用等级, 稀有度文本)，缺省 (0, '') '''
+    levList = fileInDict.get('[minimum level]')
+    rarityList = fileInDict.get('[rarity]')
+    lev = levList[0] if levList is not None else 0
+    rarity = rarityMap.get(rarityList[0]) if rarityList is not None else ''
+    return lev, rarity
 
 def get_Item_Info_In_Dict(itemID:int,cacheDict:dict=None):
     if cacheDict is None:
@@ -448,26 +411,7 @@ def get_Item_Info_In_Dict(itemID:int,cacheDict:dict=None):
         res = {}
     return res 
 
-def get_Item_Info_In_Text(itemID:int,cacheDict:dict=None):
-    if cacheDict is None:
-        cacheDict = PVFcacheDict
-    stackableDetialDict:dict = cacheDict.get('stackable_detail')
-    equipmentDetailDict:dict = cacheDict.get('equipment_detail')
-    if stackableDetialDict is not None:
-        resDict = stackableDetialDict.get(itemID)
-        if resDict is None:
-            resDict = equipmentDetailDict.get(itemID)
-        
-        res = pvfReader.TinyPVF.dictSegment2text(resDict)
-    else:
-        res = ''
-    return res
 
-def avatar_Hidden_trans(avatarHiddenList_En:list):
-    for i in range(len(avatarHiddenList_En)):
-        for j,value in enumerate(avatarHiddenList_En[i]):
-            avatarHiddenList_En[i][j] = avatarHiddenMap[value]
-    return avatarHiddenList_En
 
 def equipmentDetailDict_transform(equipmentStructuredDict_:dict=None,globalChange=True):
     if globalChange:
@@ -627,6 +571,35 @@ def searchItem(keys,itemList=None,fuzzy=True):
     
     return sorted(res,key=lambda x:len(x[1]))
 
+
+def search_Items(searchDict,nameKey='',levMin=0,levMax=999,rarity='----',fuzzy=False,
+                 usePVFText=False,limit=100000,normalize=False,raritySuffix=None):
+    '''按关键词/等级/稀有度筛选物品字典，返回 [[itemID,显示名,等级,稀有度,字段字典],...]。
+    normalize=True 时把 -1 级与空稀有度归一（道具表行为）；raritySuffix 给装备表补'时装'。'''
+    if usePVFText and nameKey:
+        searchDict = {itemID: f'{name}\n' + get_Item_Info_In_Text(itemID).replace(r'%%',r'%').strip()
+                      for itemID,name in searchDict.items()}
+    if nameKey:
+        searchList = searchItem(nameKey,list(searchDict.items()),fuzzy=fuzzy)
+    else:
+        searchList = list(searchDict.items())
+    if levMin==0 and levMax==999 and rarity=='----':
+        searchList = list(searchList)[:limit]
+    resList = []
+    for itemID,nameAndContent in searchList:
+        fileInDict = get_Item_Info_In_Dict(itemID)
+        lev,itemRarity = get_lev_rarity(fileInDict)
+        if normalize:
+            if lev==-1:
+                lev = 0
+            if itemRarity=='':
+                itemRarity = '-'
+        if raritySuffix is not None:
+            itemRarity += raritySuffix(fileInDict)
+        if levMin<=lev<=levMax and (rarity=='----' or rarity in itemRarity):
+            resList.append([itemID,nameAndContent.split('\n')[0],lev,itemRarity,fileInDict])
+    return resList
+
 def searchMagicSeal(key):
     res = []
     pattern = '.*?'.join(key)
@@ -717,8 +690,11 @@ def loadItems2(usePVF=False,pvfPath='',MD5='0',retType='log',encode='big5',useCa
         elif  '.pvf' in pvfPath and p.exists():
             MD5 = hashlib.md5(open(pvfPath,'rb').read()).hexdigest().upper()
             if useCache and MD5 in cacheManager.allMD5():
-                
-                PVFcacheDict = cacheManager.get(MD5)                
+                try:
+                    PVFcacheDict = cacheManager.get(MD5)
+                except FileNotFoundError:   #缓存文件丢了（换机器/打包后首次运行）→ 当没缓存，重新解析
+                    print('缓存文件丢失，重新解析PVF')
+                    return loadItems2(usePVF,pvfPath,'',retType,encode,False)
                 if PVFcacheDict.get('encode')!=encode:  #编码不同
                     print('编码变化，重新加载')
                     return loadItems2(usePVF,pvfPath,'',retType,encode,False)

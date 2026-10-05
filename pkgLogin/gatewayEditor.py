@@ -264,7 +264,7 @@ class GatewaymanagerApp:
             dllData = json.dumps(loginInfo).encode()
             dllData = zlib.compress(dllData)
             #os.mkdir(os.path.join(gameDir,'pkglogin'))
-            dllPath = os.path.join(gameDir,'pkglogin\pkglogin.dll')
+            dllPath = os.path.join(gameDir,r'pkglogin\pkglogin.dll')
             with open(dllPath,'wb') as f:
                 f.write(dllData)
             return dllPath

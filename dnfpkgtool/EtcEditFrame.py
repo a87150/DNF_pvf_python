@@ -476,10 +476,6 @@ class EtcframeWidget(ttk.Frame):
         
         self.update_Edited_Box()
 
-    def open_ETC(self):
-        print(self.etcFileBox.curselection())
-        print(self.etcFiles[self.etcFileBox.curselection()])
-        pass
 
     def remove_Edited(self):
         selPath = self.editedList.get(self.editedList.curselection())
@@ -498,13 +494,7 @@ class EtcframeWidget(ttk.Frame):
             self.jsonViewE.insert(tk.END,jsonString)
         self.after(100,func)
 
-    def open_ETC_E(self,e):
-        self.open_ETC()
         
-    def open_IndepentDrop(self):
-        pass
-    def open_IndepentDrop_E(self,e):
-        self.open_IndepentDrop()
 
 
 if __name__ == "__main__":

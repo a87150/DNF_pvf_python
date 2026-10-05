@@ -8,7 +8,7 @@ import threading
 def inThread(func):
     def inner(*args,**kw):
         t = threading.Thread(target=lambda:func(*args,**kw))
-        t.setDaemon(True)
+        t.daemon = True
         t.start()
         return t
     return inner

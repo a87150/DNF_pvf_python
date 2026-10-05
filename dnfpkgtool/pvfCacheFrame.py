@@ -8,27 +8,8 @@ import time
 import csv
 from dnfpkgtool.jsonViewer import json_tree
 import threading
-rarityMap = {
-    0:'普通',
-    1:'高级',
-    2:'稀有',
-    3:'神器',
-    4:'史诗',
-    5:'勇者',
-    6:'传说',
-    7:'神话',
-    
-}
-rarityMapRev = {
-    '普通':0,
-    '高级':1,
-    '稀有':2,
-    '神器':3,
-    '史诗':4,
-    '勇者':5,
-    '传说':6,
-    '神话':7
-}
+rarityMap = cacheM.rarityMap
+rarityMapRev = cacheM.rarityMapRev
 equipmentForamted = {}  #格式化的装备字典
 creatureEquipDict = {}  #存储所有宠物装备
 
@@ -147,7 +128,7 @@ class PVFCacheCfgFrame(TitleBarFrame):
             json_tree(self.jsonTree,'',showDict)
         inner()
         '''t = threading.Thread(target=inner)
-        t.setDaemon(True)
+        t.daemon = True
         t.start()'''
 
     def renameCache(self):
@@ -221,16 +202,7 @@ class PVFCacheCfgFrame(TitleBarFrame):
                 for type3,equDictFin in type3Dict.items():
                     for id,name in equDictFin.items():
                         fileInDict = cacheM.get_Item_Info_In_Dict(id)
-                        levInList = fileInDict.get('[minimum level]')
-                        if levInList is not None:
-                            lev = levInList[0]
-                        else:
-                            lev = 0
-                        rarityInList = fileInDict.get('[rarity]')
-                        if rarityInList is not None:
-                            rarity = rarityMap.get(rarityInList[0])
-                        else:
-                            rarity = ''
+                        lev, rarity = cacheM.get_lev_rarity(fileInDict)
                         equipment_type = fileInDict.get('[equipment type]')
                         if 'avatar' in str(equipment_type) or ('avatar' in str(fileInDict.keys()) and '[stackable type]'):
                             rarity += '时装'
@@ -253,16 +225,7 @@ class PVFCacheCfgFrame(TitleBarFrame):
         res = [['名称','ID','原始种类','种类','使用等级','稀有度']]
         for itemID,name in searchList:
             fileInDict = cacheM.get_Item_Info_In_Dict(itemID)
-            levInList = fileInDict.get('[minimum level]')
-            if levInList is not None:
-                lev = levInList[0]
-            else:
-                lev = 0
-            rarityInList = fileInDict.get('[rarity]')
-            if rarityInList is not None:
-                rarity = rarityMap.get(rarityInList[0])
-            else:
-                rarity = ''
+            lev, rarity = cacheM.get_lev_rarity(fileInDict)
             typeInList = fileInDict.get('[stackable type]')
             if typeInList is not None:
                 originType = typeInList[0][1:-1]

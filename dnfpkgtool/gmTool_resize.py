@@ -5,15 +5,7 @@ from tkinter import ttk
 from dnfpkgtool.widgets.toolTip import CreateToolTip
 from zhconv import convert
 import dnfpkgtool.serverProtocol as server
-from dnfpkgtool.widgets.imageLabel import ImageLabel
 IconPath = './config/ico.ico'
-if not hasattr(ttk,'Spinbox'):
-    class Spinbox(ttk.Entry):
-        def __init__(self, master=None, **kw):  #from_=0,to=99,
-            ttk.Entry.__init__(self, master, "ttk::spinbox", **kw)
-        def set(self, value):
-            self.tk.call(self._w, "set", value)
-    ttk.Spinbox = Spinbox
 
 oldPrint = print
 logFunc = [oldPrint]
@@ -42,7 +34,7 @@ WIDTH,HEIGHT = cacheM.config['SIZE']
 letter_send_dict = {}
 
 class GMToolWindow(tk.Toplevel):
-    def __init__(self,master,title='GM工具',cNo=0,sponsorFrame=True,sshAutoConnect=True,*args,**kw):
+    def __init__(self,master,title='GM工具',cNo=0,sshAutoConnect=True,*args,**kw):
         self.cNo = cNo
         self.uid = 0
         self.uids = []
@@ -73,8 +65,6 @@ class GMToolWindow(tk.Toplevel):
         self.buildTab_event(self.tab,'活动管理')
         self.buildTab_server(self.tab,'服务器')
         self.serverTabID = self.tab.tabs()[-1]
-        if sponsorFrame:
-            self.buildTab_sponsor(self.tab,'联系我们')
         self.update_Info()
         self.resizable(False,False)
     
@@ -987,24 +977,6 @@ class GMToolWindow(tk.Toplevel):
     def buildTab_server(self,tabView:ttk.Notebook,tabName:str):
         self.serverApp = server.ServerCtrlFrame(tabView,titlefunc=self.title,autoConnect=self.sshAutoConnect)
 
-    def buildTab_sponsor(self,tabView:ttk.Notebook,tabName:str):
-        def loadPics():
-            size = adLabel.winfo_width(), adLabel.winfo_height()
-            if size[0] < 10:
-                return self.after(100,loadPics)
-            adLabel.load(r'config\sponsor.jpg',size,root=self)
-        sponsorFrame = tk.Frame(tabView)
-        tabView.add(sponsorFrame,text=tabName)
-        #tk.Label(sponsorFrame,text='GM管理工具激活密钥获取详情请加群709527238。').pack()
-        adLabel = ImageLabel(sponsorFrame,borderwidth=0)
-        adLabel.pack(fill='both',expand=True)
-        self.after(100,loadPics)
-        CreateToolTip(sponsorFrame,'感谢支持，GM管理工具激活密钥请扫码加群，量大从优')
-        
-
-
-
-            
 if __name__=='__main__':
     t = tk.Tk()
     t.geometry('0x0')

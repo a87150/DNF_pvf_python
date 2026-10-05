@@ -3,13 +3,6 @@ import tkinter as tk
 import tkinter.ttk as ttk
 import pyperclip
 import pickle
-if not hasattr(ttk,'Spinbox'):
-    class Spinbox(ttk.Entry):
-        def __init__(self, master=None, **kw):  #from_=0,to=99,
-            ttk.Entry.__init__(self, master, "ttk::spinbox", **kw)
-        def set(self, value):
-            self.tk.call(self._w, "set", value)
-    ttk.Spinbox = Spinbox
 
 
 

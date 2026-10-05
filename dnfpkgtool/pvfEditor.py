@@ -164,25 +164,6 @@ class StringTableEditor(StringTable):
         print(f'stringtable新增字符：{string.strip()}-{self.length + self.addNum - 1}')
         self.stringRevMap[string] = self.length + self.addNum - 1
         return self.length + self.addNum - 1    #从0开始索引，需要-1
-    def to_bytes_old(self):
-        StrIndexBytes_new = bytearray()
-        print('新增字符数：',self.addNum,f'总字符数:{self.length}->{self.length+self.addNum}')
-        for i in range(self.length+1+self.addNum):
-            intValue:int = int.from_bytes(self.StringTableStrIndexBytes[i*4:i*4+4],'little')
-            intValue_new = intValue + self.addNum*4
-            StrIndexBytes_new += intValue_new.to_bytes(4,'little')
-        length_new = self.length+self.addNum
-        #res = length_new.to_bytes(4,'little') + StrIndexBytes_new + self.stringTableChunk
-        length = self.length+1+self.addNum + len(self.stringTableChunk)
-        if length%4!=0:
-            print(f'stringtable补充字符：{(4-length%4)}')
-            zeroNum = (4-length%4)
-            self.stringTableChunk += b'\x00' * zeroNum
-            StrIndex_last = int.from_bytes(StrIndexBytes_new[-4:],'little')
-            StrIndex_last += zeroNum
-            StrIndexBytes_new[-4:] = StrIndex_last.to_bytes(4,'little')
-        res = length_new.to_bytes(4,'little') + StrIndexBytes_new + self.stringTableChunk
-        return res
 
     def to_bytes(self):
         StrIndexBytes_new = bytearray()
@@ -505,9 +486,6 @@ class TinyPVFEditor(TinyPVF):
         content = self.read_File_In_Decrypted_Bin(fpath)
         return self.content2List_with_bin(content,stringtable,nString,stringQuote)
     
-    def read_FIle_In_Dict_with_Bin(self,fpath='',pvfheader:PVFHeader=None,stringtable:StringTable=None,nString:Lst_lite2=None,fileTreeDict:dict=None):
-        fileInListWithTypeAndBin = self.read_File_In_List_with_Bin(fpath,pvfheader,stringtable,nString,fileTreeDict)
-        return self.list2Dict_with_bin(fileInListWithTypeAndBin)
     
     @staticmethod
     def dict2list(fileInDict:dict,fileType='stackable'):
@@ -669,123 +647,13 @@ class TinyPVFEditor(TinyPVF):
         binary += b'\x00' * ((4-(len(binary)%4)) % 4)
         return binary
     
-    def _dict2DecryptedBin3(self,fileInDict:dict,filePath:str):
-        '''完全新生成文件段'''
-        def build(newDict:dict):
-            '''TODO: 新字段的添加'''
-            tmp_binary = b''
-            for key,values in newDict.items():
-                if values==[] or values=={} or values=='':
-                    continue    #空字段跳过
-                stringIndex  = self.stringTable.add(key)
-                tmp_binary += SEG_KEY.to_bytes(1,'little') + stringIndex.to_bytes(4,'little')  #字段字节
-                if isinstance(values,dict): #是段中段
-                    tmp_binary += build(values)
-                elif isinstance(values,list):   #字段内数值处理
-                    for i,value in enumerate(values):
-                        if isinstance(value,str):
-                            stringIndex = stringTable.add(value)    #stringtable添加新的字段
-                            tmp_binary += STRING.to_bytes(1,'little') + stringIndex.to_bytes(4,'little')
-                        elif isinstance(value,int):
-                            tmp_binary += INT.to_bytes(1,'little') + struct.pack('i',value)#value.to_bytes(4,'little')
-                        elif isinstance(value,float):
-                            tmp_binary += FLOAT.to_bytes(1,'little') + struct.pack('f',value)
-                    
-                if segDict.get(key)==True:  #有段落结束符号
-                    stringIndex  = self.stringTable.add('[/'+key[1:])
-                    tmp_binary += SEG_KEY.to_bytes(1,'little') + stringIndex.to_bytes(4,'little')  #字段字节
-                #tmp_binary += SEG_KEY.to_bytes(1,'little') + stringIndex.to_bytes(4,'little')  #字段字节
-
-            return tmp_binary
-
-        SEG_KEY = 5
-        STRING = 7
-        INT = 2
-        FLOAT = 4
-        fileType = filePath.split('/',1)[0]
-        segDict = keywordsDict.get(fileType)
-        stringTable = self.stringTable
-        if '//' in filePath:
-            filePath = filePath.replace('//','/')
-
-        binary = b'\xb0\xd0'
-        binary += build(fileInDict)
-        binary += b'\x00' * ((4-(len(binary)%4)) % 4)
-        return binary
     
-    def _dict2DecryptedBin(self,fileInDict:list,filePath:str):
-        '''在原有字段的基础上编辑字段'''
-        def build(newDict:dict,oldDictWithBytes:dict):
-            '''TODO: 新字段的添加'''
-            tmp_binary = b''
-            for key,values in newDict.items():
-                seg = oldDictWithBytes.get(key)
-                if seg is None:
-                    continue
-                oldValues,oldBytes = seg
-                tmp_binary += oldBytes[0]  #字段字节
-                if isinstance(values,dict): #是段中段
-                    tmp_binary += build(values,oldValues)
-                elif isinstance(values,list):   #字段内数值处理
-                    for i,value in enumerate(values):
-                        if i<len(oldValues) and value==oldValues[i]: #没有变化
-                            tmp_binary += oldBytes[i+1]
-                            continue
-                        elif isinstance(value,str):
-                            stringIndex = stringTable.add(value)    #stringtable添加新的字段
-                            tmp_binary += STRING.to_bytes(1,'little') + stringIndex.to_bytes(4,'little')
-                        elif isinstance(value,int):
-                            tmp_binary += INT.to_bytes(1,'little') + struct.pack('i',value)#value.to_bytes(4,'little')
-                        elif isinstance(value,float):
-                            tmp_binary += FLOAT.to_bytes(1,'little') + struct.pack('f',value)
-                    if oldBytes[-1][0]==SEG_KEY:#原始字节结尾是字段（[/字段名]）
-                        tmp_binary += oldBytes[-1]
-            if oldBytes[-1][0]==SEG_KEY:#原始字节结尾是字段（[/字段名]）
-                if tmp_binary[-5:]!=oldBytes[-1]:
-                    tmp_binary += oldBytes[-1]  #结尾字段不同，则把结尾字段加进来
-            return tmp_binary
-
-        SEG_KEY = 5
-        STRING = 7
-        INT = 2
-        FLOAT = 4
-        fileType = filePath.split('/',1)[0]
-        segDict = keywordsDict.get(fileType)
-        stringTable = self.stringTable
-        
-        if '//' in filePath:
-            filePath = filePath.replace('//','/')
-        fileInDict_origin = self.read_FIle_In_Dict_with_Bin(filePath)
-
-        binary = b'\xb0\xd0'
-        binary += build(fileInDict,fileInDict_origin)
-        binary += b'\x00' * ((4-(len(binary)%4)) % 4)
-        return binary
     
     @staticmethod
     def itemID2itemPath(itemID,lst:LstEditor):
         path = lst.baseDir + '/' +lst.tableDict.get(itemID)
         return path
 
-    def read_File_In_Bin(self,fpath:str='',pvfHeader=None):
-        '''传入路径，返回未解密的字节流'''
-        fpath = fpath.lower().replace('\\','/')
-        if fpath[0]=='/':
-            fpath = fpath[1:]
-        leaf =  self.fileTreeDict.get(fpath)
-        if leaf is None:
-            self.load_Leafs(paths=[fpath])
-            leaf =  self.fileTreeDict.get(fpath)
-        if pvfHeader is None:
-            pvfHeader = self.pvfHeader
-        if self.fileContentDict.get(fpath) is not None:
-            return self.fileContentDict.get(fpath)
-        try:
-            res = pvfHeader.read_bytes(pvfHeader.filePackIndexShift+leaf['relativeOffset'],leaf['fileLength'])
-        except:
-            print(fpath,leaf)
-            res = b''
-        return res
     
     def read_File_In_Decrypted_Bin(self,fpath:str='',pvfHeader=None):
         '''传入路径，返回初步解密后的字节流'''
@@ -812,29 +680,6 @@ class TinyPVFEditor(TinyPVF):
         #self.fileContentDict[fpath] = res
         return res
     
-    def newFile(self,fileType='stackable',fileName='fileName'):
-        '''TODO '''
-        def newLeaf():
-            leaf = {
-                'filePath' : lst.baseDir+'/'+fname.decode("CP949").lower(),  #全部转换为小写
-                'content':b'',
-            }
-            return leaf
-        def get_new_dict():
-            if fileType=='stackable':
-                newDict = {'[stackable type]':['waste',0]}
-            elif fileType=='equipment':
-                newDict = {'[equipment type]':[]}
-            fill_Dict_SegKeys(newDict)
-            return newDict
-        lst:LstEditor = self.lstDict.get(fileType)
-        if lst is None:
-            return '未实现'
-        itemID,fname = lst.add(fileName)
-        leaf = newLeaf()
-        self.editedLeafDict = leaf
-        leaf['itemInDict'] = get_new_dict()
-        fill_Dict_SegKeys()
 
     def gen_File_chunk(self,uuid=b'',fileVersion=None):
         def calcCRC(leaf:dict):

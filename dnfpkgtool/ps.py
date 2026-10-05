@@ -78,7 +78,7 @@ def saveStart(runFunc=lambda:...):
     if workingFlg:
         return False
     t = threading.Thread(target=inner)
-    t.setDaemon(True)
+    t.daemon = True
     t.start()
     
 
