@@ -1,6 +1,6 @@
 # DNF 私服工具箱（背包 / PVF / GM）
 
-基于 [a87150/DNF_pvf_python](https://github.com/a87150/DNF_pvf_python.git) 的克隆版本，并完成一轮结构精简与兼容性升级：裁剪死代码约 4700 行，修复打包（PyInstaller）与汉字编码问题，调整界面布局。
+本项目是 [Zageku/DNF_pvf_python](https://github.com/Zageku/DNF_pvf_python) 的 **fork**（本仓库：[a87150/DNF_pvf_python](https://github.com/a87150/DNF_pvf_python)）。原版功能全部保留，并在此之上完成一轮结构精简与兼容性升级：裁剪死代码约 4700 行，修复打包（PyInstaller）与汉字编码问题，调整界面布局。
 
 > 仅用于自建 DNF 私服的日常维护。本工具会直接读写线上数据库与 `Script.pvf`，操作前务必备份。
 
@@ -177,3 +177,9 @@ dnf/
 ## 更新记录
 
 - **搜索与修改物品合并**：PVF 编辑器的搜索面板新增「载入修改」按钮，选中搜索结果点一下就把该物品填进背包页签的“修改物品”控件，不必再手输物品名（搜索后端本来就是同一套 search_Items，这次把入口也并到一个面板上）。
+
+## 来源
+
+- 上游原版：[Zageku/DNF_pvf_python](https://github.com/Zageku/DNF_pvf_python)
+- 本仓库（fork）：[a87150/DNF_pvf_python](https://github.com/a87150/DNF_pvf_python)
+- 尊重原作者版权与致谢；本 fork 的改动集中在结构精简、打包与编码修复、界面调整，详见「升级改动清单」。
