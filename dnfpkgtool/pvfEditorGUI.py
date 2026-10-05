@@ -99,6 +99,13 @@ def clearFrame(w:tk.Frame):
         elif type(widget) in [ttk.Frame,tk.Frame,tk.LabelFrame,ttk.LabelFrame]:
             clearFrame(widget)
 
+def _hint_pick_item(widget):
+    """拿不到 itemID 时的提示；tab 的 log 由主框架注入，单测里可能没有"""
+    log = getattr(widget,'log',None)
+    if log is not None:
+        log('请先在搜索结果里选中一件物品')
+
+
 def bind_command(widget,eventStr,cmd):
     widget.bind(eventStr,cmd)
     if type(widget) in [ttk.Frame,tk.Frame,tk.LabelFrame,ttk.LabelFrame]:
@@ -579,12 +586,15 @@ class ItemSearchPanel(ttk.Labelframe):
             self.onPick(itemID)
 
     def selected_ID(self):
-        values = self.resultTree.item(self.resultTree.focus())['values']
-        if not values:
+        """优先取选中行，其次退回 focus 行；都拿不到返回 None"""
+        selection = self.resultTree.selection()
+        iid = selection[0] if selection else self.resultTree.focus()
+        if not iid:
             return None
         try:
-            return int(values[0])
-        except:
+            values = self.resultTree.item(iid)['values']
+            return int(values[0]) if values else None
+        except Exception:
             return None
 
     def _submit(self,func):
@@ -845,9 +855,13 @@ class PvfeditstackableframeWidget(ttk.Frame):
         
         #jsoneditor.editjson(itemInDict,print,options={'mode':'code'},title=itemInDict.get('[name]'))
 
-    def btn_edit_with_new_file(self):
-        itemID = self.searchPanel.selected_ID()
-        if itemID is None or self.pvf is None:
+    def btn_edit_with_new_file(self,itemID=None):
+        if itemID is None:
+            itemID = self.searchPanel.selected_ID()
+        if itemID is None:
+            _hint_pick_item(self)
+            return False
+        if self.pvf is None:
             return False
         itemName = cacheM.stackableDict.get(itemID)
         filePath = self.pvf.itemID2itemPath(itemID,self.lst)
@@ -863,9 +877,13 @@ class PvfeditstackableframeWidget(ttk.Frame):
         leaf['indexInTreeView'] = self.editIndex
         self.editIndex += 1
 
-    def btn_edit_file(self):
-        itemID = self.searchPanel.selected_ID()
-        if itemID is None or self.pvf is None:
+    def btn_edit_file(self,itemID=None):
+        if itemID is None:
+            itemID = self.searchPanel.selected_ID()
+        if itemID is None:
+            _hint_pick_item(self)
+            return False
+        if self.pvf is None:
             return False
         itemName = cacheM.stackableDict.get(itemID)
         if itemName is None:
@@ -1497,9 +1515,13 @@ class PvfeditequipmentframeWidget(ttk.Frame):
         
         #jsoneditor.editjson(itemInDict,print,options={'mode':'code'},title=itemInDict.get('[name]'))
 
-    def btn_edit_with_new_file(self):
-        itemID = self.searchPanel.selected_ID()
-        if itemID is None or self.pvf is None:
+    def btn_edit_with_new_file(self,itemID=None):
+        if itemID is None:
+            itemID = self.searchPanel.selected_ID()
+        if itemID is None:
+            _hint_pick_item(self)
+            return False
+        if self.pvf is None:
             return False
         itemName = cacheM.equipmentDict.get(itemID)
         filePath = self.pvf.itemID2itemPath(itemID,self.lst)
@@ -1521,9 +1543,13 @@ class PvfeditequipmentframeWidget(ttk.Frame):
             skillEntrys[0][0].config(values=[f'{key}-{value}' for key,value in cacheM.PVFcacheDict.get('jobTagDict').items()])
             #skillEntrys[0][0].current(0)
 
-    def btn_edit_file(self):
-        itemID = self.searchPanel.selected_ID()
-        if itemID is None or self.pvf is None:
+    def btn_edit_file(self,itemID=None):
+        if itemID is None:
+            itemID = self.searchPanel.selected_ID()
+        if itemID is None:
+            _hint_pick_item(self)
+            return False
+        if self.pvf is None:
             return False
         itemName = cacheM.equipmentDict.get(itemID)
         if itemName is None:
