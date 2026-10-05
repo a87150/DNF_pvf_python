@@ -1,6 +1,6 @@
 # DNF 私服工具箱（背包 / PVF / GM）
 
-基于 [a87150/DNF_pvf_python](https://github.com/a87150/DNF_pvf_python.git) 的克隆版本，并完成一轮结构精简与兼容性升级：裁剪死代码约 4700 行，修复打包（PyInstaller）与汉字编码问题，调整界面布局。
+基于 https://github.com/Zageku/DNF_pvf_python 的克隆版本，并完成一轮结构精简与兼容性升级：裁剪死代码约 4700 行，修复打包（PyInstaller）与汉字编码问题，调整界面布局。
 
 > 仅用于自建 DNF 私服的日常维护。本工具会直接读写线上数据库与 `Script.pvf`，操作前务必备份。
 
