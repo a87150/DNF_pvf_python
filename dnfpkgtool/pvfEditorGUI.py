@@ -403,14 +403,15 @@ def _avatar_Rarity_Suffix(fileInDict:dict):
 class ItemSearchPanel(ttk.Labelframe):
     """筛选条件 + 结果树 + 提交（道具/装备两个 tab 共用）。
     isEquipment=True 时加装备三级分类，并按装备规则筛选（等级不归一、稀有度补'时装'）。"""
-    def __init__(self,master,isEquipment=False,onPick=None,onSubmitBag=None,onSubmitMail=None,onLoadEdit=None,**kw):
+    def __init__(self,master,isEquipment=False,onPick=None,onSubmitBag=None,onSubmitMail=None,onEditData=None,onTemplate=None,**kw):
         kw.setdefault('text','搜索')
         super(ItemSearchPanel,self).__init__(master,**kw)
         self.isEquipment = isEquipment
         self.onPick = onPick
         self.onSubmitBag = onSubmitBag
         self.onSubmitMail = onSubmitMail
-        self.onLoadEdit = onLoadEdit   #载入到背包页签的"修改物品"控件（搜索与修改共用同一处搜索）
+        self.onEditData = onEditData   #“修改物品数据”：把结果列表选中项载入右侧道具数据修改面板
+        self.onTemplate = onTemplate   #“以该物品为模板”：以结果列表选中项为准新建
         row0 = ttk.Frame(self)
         row0.pack(fill='x',side='top')
         ttk.Label(row0,text='关键词',width=6).pack(side='left')
@@ -470,7 +471,8 @@ class ItemSearchPanel(ttk.Labelframe):
         btnFrame.pack(fill='x',side='top',pady=2)
         ttk.Button(btnFrame,text='提交编辑',command=lambda:self._submit(self.onSubmitBag)).pack(expand=True,fill='x',side='left')
         ttk.Button(btnFrame,text='提交邮件',command=lambda:self._submit(self.onSubmitMail)).pack(expand=True,fill='x',side='left')
-        ttk.Button(btnFrame,text='修改物品数据',command=lambda:self._submit(self.onLoadEdit)).pack(expand=True,fill='x',side='left')
+        ttk.Button(btnFrame,text='修改物品数据',command=lambda:self._submit(self.onEditData)).pack(expand=True,fill='x',side='left')
+        ttk.Button(btnFrame,text='以该物品为模板',command=lambda:self._submit(self.onTemplate)).pack(expand=True,fill='x',side='left')
 
     def _load_Types(self):
         """分类候选延迟到真要用时再取（缓存与PVF数据是运行中才加载好的）"""
@@ -592,53 +594,15 @@ class ItemSearchPanel(ttk.Labelframe):
 
 
 class PvfeditstackableframeWidget(ttk.Frame):
-    def __init__(self, master=None, onSubmitBag=None, onSubmitMail=None, onLoadEdit=None, **kw):
+    def __init__(self, master=None, onSubmitBag=None, onSubmitMail=None, **kw):
         super(PvfeditstackableframeWidget, self).__init__(master, **kw)
         self.onSubmitBag = onSubmitBag
         self.onSubmitMail = onSubmitMail
-        self.onLoadEdit = onLoadEdit
         self.leftColumn = ttk.Frame(self)
-        self.editedListFrame = ttk.Labelframe(self.leftColumn)
-        self.editedListFrame.configure(height=200, text='已编辑列表', width=300)
-        self.searchNameE = ttk.Combobox(self.editedListFrame)
-        self.searchNameE.pack(fill="x", side="top")
-        self.idE = ttk.Entry(self.editedListFrame)
-        self.idE.pack(fill="x", side="top")
-        self.addLeafFrame = ttk.Frame(self.editedListFrame)
-        self.addLeafFrame.configure(height=23, width=200)
-        self.copyThisBtn = ttk.Button(self.addLeafFrame)
-        self.copyThisBtn.configure(state="disabled", text='以该物品为模板')
-        self.copyThisBtn.pack(expand="true", fill="x", side="left")
-        self.copyThisBtn.configure(command=self.btn_edit_with_new_file)
-        self.editThisBtn = ttk.Button(self.addLeafFrame)
-        self.editThisBtn.configure(state="disabled", text='修改该物品数据')
-        self.editThisBtn.pack(expand="true", fill="x", side="right")
-        self.editThisBtn.configure(command=self.btn_edit_file)
-        self.addLeafFrame.pack(fill="x", side="top")
-        self.treeViewFrame = ttk.Frame(self.editedListFrame)
-        self.treeViewFrame.configure(height=200, width=300)
-        self.editedTree = ttk.Treeview(self.treeViewFrame)
-        self.editedTree.configure(selectmode="browse", show="headings")
-        self.editedTree.pack(expand="true", fill="both", side="left")
-        self.editedTree.bind(
-            "<<TreeviewSelect>>",
-            self.select_treeview_item_Event,
-            add="")
-        self.listBar = ttk.Scrollbar(self.treeViewFrame)
-        self.listBar.configure(orient="vertical")
-        self.listBar.pack(fill="y", side="right")
-        self.treeViewFrame.pack(expand="true", fill="both", side="top")
-        self.treeViewBtnFrame = ttk.Frame(self.editedListFrame)
-        self.treeViewBtnFrame.configure(height=23, width=200)
-        self.delLeafBtn = ttk.Button(self.treeViewBtnFrame)
-        self.delLeafBtn.configure(text='移除该项编辑')
-        self.delLeafBtn.pack(fill="x", side="top")
-        self.delLeafBtn.configure(command=self.remove_selected_item)
-        self.treeViewBtnFrame.pack(fill="x", side="top")
-        self.searchPanel = ItemSearchPanel(self.leftColumn,isEquipment=False,onLoadEdit=self.onLoadEdit,
-                                           onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail)
+        self.searchPanel = ItemSearchPanel(self.leftColumn,isEquipment=False,
+                                           onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail,
+                                           onEditData=self.btn_edit_file,onTemplate=self.btn_edit_with_new_file)
         self.searchPanel.pack(expand="true", fill="both", side="top")
-        self.editedListFrame.pack(expand="true", fill="both", side="top")
         self.leftColumn.pack(expand="true", fill="both", side="left")
         self.itemEditFrame = ttk.Labelframe(self)
         self.itemEditFrame.configure(height=200, text='道具数据修改', width=200)
@@ -819,27 +783,8 @@ class PvfeditstackableframeWidget(ttk.Frame):
         self.currentLeaf = None
         self.editIndex = 0
         self.exFrameObj = None
-        self.listBar.config(command=self.editedTree.yview)
-        self.editedTree.config(yscrollcommand=self.listBar.set)
         CreateToolTip(self.advanceBtn,'打开浏览器对json文件进行修改\n在浏览器中点击【√】以保存数据')
         CreateToolTip(self.saveFileEditBtn,'保存对该文件的编辑至内存')
-        CreateToolTip(self.searchNameE,textFunc=lambda:self.getItemPVFInfo('输入物品名进行搜索'))
-        CreateToolTip(self.idE,textFunc=lambda:self.getItemPVFInfo('输入物品ID进行搜索'))
-        self.searchNameE.bind('<Button-1>',self.searchItem)
-        self.searchNameE.bind("<<ComboboxSelected>>",lambda e:self.readItemID('name'))
-        self.idE.bind('<FocusOut>',lambda e:self.readItemID('id'))
-        self.idE.bind('<Return>',lambda e:self.readItemID('id'))
-        self.editedTree
-        self.editedTree["columns"] = ("1", "2", "3")
-        self.editedTree['show'] = 'headings'
-        self.editedTree.column("1", width = 20, anchor ='c')
-        self.editedTree.column("2", width = 90, anchor ='c')
-        self.editedTree.column("3", width = 50, anchor ='c')
-        self.editedTree.heading("1", text ="序号")
-        self.editedTree.heading("2", text ="物品名")
-        self.editedTree.heading("3", text ="物品ID")
-        _ = self.editedTree.insert('',tk.END,values=[])
-        self.editedTree.delete(_)
         self.stkTypeE.config(values=list(SegKeyDict.get('stackable',{}).keys()))
         self.exFramesDict = {
             '[waste]': WasteframeWidget
@@ -901,7 +846,9 @@ class PvfeditstackableframeWidget(ttk.Frame):
         #jsoneditor.editjson(itemInDict,print,options={'mode':'code'},title=itemInDict.get('[name]'))
 
     def btn_edit_with_new_file(self):
-        itemID = int(self.idE.get())
+        itemID = self.searchPanel.selected_ID()
+        if itemID is None or self.pvf is None:
+            return False
         itemName = cacheM.stackableDict.get(itemID)
         filePath = self.pvf.itemID2itemPath(itemID,self.lst)
         leaf = self.pvf.fileTreeDict.get(filePath).copy()
@@ -909,93 +856,29 @@ class PvfeditstackableframeWidget(ttk.Frame):
         leaf['itemID'] = None
         leaf['filePath'] = 'stackable/'
         leaf['fn'] = None
-        leaf['itemInDict']['[name]'] = ['[新]'+itemName]
+        leaf['itemInDict']['[name]'] = ['[新]'+str(itemName)]
         self.fillFrameWithItemLeaf(leaf)
         self.select_stkType()
-        values = [self.editIndex,'[新]'+itemName,None]
         self.editLeafDict[self.editIndex] = leaf
-        node = self.editedTree.insert('',tk.END,values=values)
         leaf['indexInTreeView'] = self.editIndex
         self.editIndex += 1
-        self.editedTree.see(node)
-        self.editedTree.selection_set(node)
-
-    def enable_Btns(self):
-        self.editThisBtn.config(state='normal')
-        #self.copyThisBtn.config(state='normal')
-    def pick_Search_Item(self,itemID):
-        """搜索结果选中后填入 ID 框并载入字段（未加载 PVF 时只填 ID）"""
-        self.searchNameE.config(values=[])
-        self.searchNameE.delete(0,tk.END)
-        self.searchNameE.insert(0,str(cacheM.ITEMS_dict.get(itemID)))
-        self.idE.delete(0,tk.END)
-        self.idE.insert(0,itemID)
-        if self.pvf is not None:
-            self.btn_edit_file()
-
 
     def btn_edit_file(self):
-        try:
-            itemID = int(self.idE.get())
-            itemName = cacheM.stackableDict.get(itemID)
-        except:
-            self.log('请填充物品ID')
+        itemID = self.searchPanel.selected_ID()
+        if itemID is None or self.pvf is None:
             return False
+        itemName = cacheM.stackableDict.get(itemID)
         if itemName is None:
             self.log('该物品ID不存在')
             return False
-        for child in self.editedTree.get_children():
-            if itemID == self.editedTree.item(child)["values"][2]:
-                self.log('该物品ID已被添加')
-                return False
         filePath = self.pvf.itemID2itemPath(itemID,self.lst)
         leaf = self.pvf.fileTreeDict.get(filePath).copy()
         leaf['itemInDict'] = self.pvf.read_File_In_Dict(filePath)
         leaf['itemID'] = itemID
         self.fillFrameWithItemLeaf(leaf)
-        #self.select_stkType()
-        values = [self.editIndex,itemName,itemID]
         self.editLeafDict[self.editIndex] = leaf
-        node = self.editedTree.insert('',tk.END,values=values)
         leaf['indexInTreeView'] = self.editIndex
         self.editIndex += 1
-        self.editedTree.see(node)
-        self.editedTree.selection_set(node)
-        
-    def select_treeview_item_Event(self, event=None):
-        selectedItem = self.editedTree.selection()
-        currentEditID = self.editedTree.item(selectedItem)['values'][0]
-        #print(currentEditID)
-        currentLeaf = self.editLeafDict.get(currentEditID)
-        if currentLeaf is None:
-            return False
-        elif currentLeaf!=self.currentLeaf:
-            self.save_file_edit()
-            self.currentLeaf = currentLeaf
-            self.fillFrameWithItemLeaf(self.currentLeaf)
-
-    def refill_treeview(self):
-        for child in self.editedTree.get_children():
-            self.editedTree.delete(child)
-        for eid,leaf in self.editLeafDict.items():
-            values = [eid,leaf['itemInDict'].get('[name]'),leaf['itemID']]
-            item = self.editedTree.insert('',tk.END,values=values)
-            print(values)
-        if self.editLeafDict=={}:
-            return False
-        self.editIndex = max(list(self.editLeafDict.keys())) + 1
-        self.currentLeaf = None
-        self.filePathE.config(state='normal')
-        clearFrame(self.itemEditFrame)
-        self.filePathE.config(state='readonly')
-        #print(self.editLeafDict)
-
-    def remove_selected_item(self):
-        selectedItem = self.editedTree.selection()
-        editID = self.editedTree.item(selectedItem)['values'][0]
-        self.editedTree.delete(selectedItem)
-        if self.editLeafDict.get(editID) is not None:
-            self.editLeafDict.pop(editID)
 
     def save_file_edit(self):
         if self.currentLeaf is None:
@@ -1051,92 +934,16 @@ class PvfeditstackableframeWidget(ttk.Frame):
         else:
             self.exFrameObj = None
     
-    def getItemPVFInfo(self,blankString='')->str:
-            if self.idE.get()=='':
-                res = blankString
-                return res
-            try:
-                itemID = int(self.idE.get())
-            except:
-                return '请输入整数ID'
-            res = cacheM.get_Item_Info_In_Text(itemID).replace(r'%%',r'%').strip()
-            return res
-    
-    def readItemID(self,name_id='id'):
-            if name_id=='id':
-                id_ = self.idE.get()
-                try:
-                    id_ = int(id_)
-                except:
-                    id_ = 0
-                name = str(cacheM.ITEMS_dict.get(int(id_)))
-            else:
-                id_,name = self.searchNameE.get().split(' ',1)
-                id_ = id_[1:-1]
-                
-            self.idE.delete(0,tk.END)
-            self.idE.insert(0,id_)
-            self.searchNameE.delete(0,tk.END)
-            self.searchNameE.insert(0,name)
-            self.searchNameE.config(values=[])
-            print(name,id_)
-
-    def searchItem(self,e:tk.Event):
-            '''搜索物品名'''
-            if e.x<100:return
-            key = self.searchNameE.get()
-            if len(key)>0:
-                res = cacheM.searchItem(key,itemList=cacheM.stackableDict.items())
-                self.searchNameE.config(values=[str([item[0]])+' '+item[1] for item in res])
-
 class PvfeditequipmentframeWidget(ttk.Frame):
-    def __init__(self, master=None, onSubmitBag=None, onSubmitMail=None, onLoadEdit=None, **kw):
+    def __init__(self, master=None, onSubmitBag=None, onSubmitMail=None, **kw):
         super(PvfeditequipmentframeWidget, self).__init__(master, **kw)
         self.onSubmitBag = onSubmitBag
         self.onSubmitMail = onSubmitMail
-        self.onLoadEdit = onLoadEdit
         self.leftColumn = ttk.Frame(self)
-        self.editedListFrame = ttk.Labelframe(self.leftColumn)
-        self.editedListFrame.configure(height=200, text='已编辑列表', width=200)
-        self.searchNameE = ttk.Combobox(self.editedListFrame)
-        self.searchNameE.pack(fill="x", side="top")
-        self.idE = ttk.Entry(self.editedListFrame)
-        self.idE.pack(fill="x", side="top")
-        self.addLeafFrame = ttk.Frame(self.editedListFrame)
-        self.addLeafFrame.configure(height=23, width=200)
-        self.copyThisBtn = ttk.Button(self.addLeafFrame)
-        self.copyThisBtn.configure(state="disabled", text='以该物品为模板')
-        self.copyThisBtn.pack(expand="true", fill="x", side="left")
-        self.copyThisBtn.configure(command=self.btn_edit_with_new_file)
-        self.editThisBtn = ttk.Button(self.addLeafFrame)
-        self.editThisBtn.configure(state="disabled", text='修改该物品数据')
-        self.editThisBtn.pack(expand="true", fill="x", side="right")
-        self.editThisBtn.configure(command=self.btn_edit_file)
-        self.addLeafFrame.pack(fill="x", side="top")
-        self.treeViewFrame = ttk.Frame(self.editedListFrame)
-        self.treeViewFrame.configure(height=200, width=300)
-        self.editedTree = ttk.Treeview(self.treeViewFrame)
-        self.editedTree.configure(selectmode="browse", show="headings")
-        self.editedTree.pack(expand="true", fill="both", side="left")
-        self.editedTree.bind(
-            "<<TreeviewSelect>>",
-            self.select_treeview_item_Event,
-            add="")
-        self.listBar = ttk.Scrollbar(self.treeViewFrame)
-        self.listBar.configure(orient="vertical")
-        self.listBar.pack(fill="y", side="right")
-        self.treeViewFrame.pack(expand="true", fill="both", side="top")
-        self.treeViewBtnFrame = ttk.Frame(self.editedListFrame)
-        self.treeViewBtnFrame.configure(height=23, width=200)
-        self.delLeafBtn = ttk.Button(self.treeViewBtnFrame)
-        self.delLeafBtn.configure(text='移除该项编辑')
-        self.delLeafBtn.pack(fill="x", side="top")
-        self.delLeafBtn.configure(command=self.remove_selected_item)
-        self.treeViewBtnFrame.pack(fill="x", side="top")
-        self.searchPanel = ItemSearchPanel(self.leftColumn,isEquipment=True,onLoadEdit=self.onLoadEdit,
-                                           onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail)
+        self.searchPanel = ItemSearchPanel(self.leftColumn,isEquipment=True,
+                                           onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail,
+                                           onEditData=self.btn_edit_file,onTemplate=self.btn_edit_with_new_file)
         self.searchPanel.pack(expand="true", fill="both", side="top")
-        self.editedListFrame.pack(expand="true", fill="both", side="top")
         self.leftColumn.pack(expand="true", fill="both", side="left")
         self.itemEditFrame = ttk.Labelframe(self)
         self.itemEditFrame.configure(height=200, text='装备数据修改', width=200)
@@ -1567,27 +1374,8 @@ class PvfeditequipmentframeWidget(ttk.Frame):
         self.pvf:TinyPVFEditor = None
         self.currentLeaf = None
         self.editIndex = 0
-        self.listBar.config(command=self.editedTree.yview)
-        self.editedTree.config(yscrollcommand=self.listBar.set)
         CreateToolTip(self.advanceBtn,'打开浏览器对json文件进行修改\n在浏览器中点击【√】以保存数据')
         CreateToolTip(self.saveFileEditBtn,'保存对该文件的编辑至内存')
-        CreateToolTip(self.searchNameE,textFunc=lambda:self.getItemPVFInfo('输入物品名进行搜索'))
-        CreateToolTip(self.idE,textFunc=lambda:self.getItemPVFInfo('输入物品ID进行搜索'))
-        self.searchNameE.bind('<Button-1>',self.searchItem)
-        self.searchNameE.bind("<<ComboboxSelected>>",lambda e:self.readItemID('name'))
-        self.idE.bind('<FocusOut>',lambda e:self.readItemID('id'))
-        self.idE.bind('<Return>',lambda e:self.readItemID('id'))
-        self.editedTree
-        self.editedTree["columns"] = ("1", "2", "3")
-        self.editedTree['show'] = 'headings'
-        self.editedTree.column("1", width = 20, anchor ='c')
-        self.editedTree.column("2", width = 90, anchor ='c')
-        self.editedTree.column("3", width = 50, anchor ='c')
-        self.editedTree.heading("1", text ="序号")
-        self.editedTree.heading("2", text ="物品名")
-        self.editedTree.heading("3", text ="物品ID")
-        _ = self.editedTree.insert('',tk.END,values=[])
-        self.editedTree.delete(_)
         self.equTypeE.config(values=list(SegKeyDict.get('equipment',{}).keys()))
         useableJobValues = [
             "[all]",
@@ -1710,7 +1498,9 @@ class PvfeditequipmentframeWidget(ttk.Frame):
         #jsoneditor.editjson(itemInDict,print,options={'mode':'code'},title=itemInDict.get('[name]'))
 
     def btn_edit_with_new_file(self):
-        itemID = int(self.idE.get())
+        itemID = self.searchPanel.selected_ID()
+        if itemID is None or self.pvf is None:
+            return False
         itemName = cacheM.equipmentDict.get(itemID)
         filePath = self.pvf.itemID2itemPath(itemID,self.lst)
         leaf = self.pvf.fileTreeDict.get(filePath).copy()
@@ -1718,101 +1508,35 @@ class PvfeditequipmentframeWidget(ttk.Frame):
         leaf['itemID'] = None
         leaf['filePath'] = 'equipment/'
         leaf['fn'] = None
-        leaf['itemInDict']['[name]'] = ['[新]'+itemName]
+        leaf['itemInDict']['[name]'] = ['[新]'+str(itemName)]
         self.fillFrameWithItemLeaf(leaf)
-        values = [self.editIndex,'[新]'+itemName,None]
         self.editLeafDict[self.editIndex] = leaf
-        node = self.editedTree.insert('',tk.END,values=values)
         leaf['indexInTreeView'] = self.editIndex
         self.editIndex += 1
-        self.editedTree.see(node)
-        self.editedTree.selection_set(node)
 
     def update_with_PVF(self):
-        self.enable_Btns()
         print(cacheM.PVFcacheDict.keys())#['jobTagDict'])
         self.jobTagDictRev = {value:key for key,value in cacheM.PVFcacheDict.get('jobTagDict').items()}        
         for skillEntrys in self.skillEntrys:
             skillEntrys[0][0].config(values=[f'{key}-{value}' for key,value in cacheM.PVFcacheDict.get('jobTagDict').items()])
             #skillEntrys[0][0].current(0)
 
-    def enable_Btns(self):
-        self.editThisBtn.config(state='normal')
-        #self.copyThisBtn.config(state='normal')
-
-    def pick_Search_Item(self,itemID):
-        """搜索结果选中后填入 ID 框并载入字段（未加载 PVF 时只填 ID）"""
-        self.searchNameE.config(values=[])
-        self.searchNameE.delete(0,tk.END)
-        self.searchNameE.insert(0,str(cacheM.ITEMS_dict.get(itemID)))
-        self.idE.delete(0,tk.END)
-        self.idE.insert(0,itemID)
-        if self.pvf is not None:
-            self.btn_edit_file()
-
     def btn_edit_file(self):
-        try:
-            itemID = int(self.idE.get())
-            itemName = cacheM.equipmentDict.get(itemID)
-        except:
-            self.log('请填充物品ID')
+        itemID = self.searchPanel.selected_ID()
+        if itemID is None or self.pvf is None:
             return False
+        itemName = cacheM.equipmentDict.get(itemID)
         if itemName is None:
             self.log('该物品ID不存在')
             return False
-        for child in self.editedTree.get_children():
-            if itemID == self.editedTree.item(child)["values"][2]:
-                self.log('该物品ID已被添加')
-                return False
-
-
         filePath = self.pvf.itemID2itemPath(itemID,self.lst)
         leaf = self.pvf.fileTreeDict.get(filePath).copy()
         leaf['itemInDict'] = self.pvf.read_File_In_Dict(filePath)
         leaf['itemID'] = itemID
         self.fillFrameWithItemLeaf(leaf)
-        values = [self.editIndex,itemName,itemID]
         self.editLeafDict[self.editIndex] = leaf
-        node = self.editedTree.insert('',tk.END,values=values)
         leaf['indexInTreeView'] = self.editIndex
         self.editIndex += 1
-        self.editedTree.see(node)
-        self.editedTree.selection_set(node)
-        
-    def select_treeview_item_Event(self, event=None):
-        selectedItem = self.editedTree.selection()
-        currentEditID = self.editedTree.item(selectedItem)['values'][0]
-        print(currentEditID)
-        currentLeaf = self.editLeafDict.get(currentEditID)
-        if currentLeaf is None:
-            return False
-        elif currentLeaf!=self.currentLeaf:
-            self.read_and_save_file_edit()
-            self.currentLeaf = currentLeaf
-            self.fillFrameWithItemLeaf(self.currentLeaf)
-
-    def refill_treeview(self):
-        for child in self.editedTree.get_children():
-            self.editedTree.delete(child)
-        for eid,leaf in self.editLeafDict.items():
-            values = [eid,leaf['itemInDict'].get('[name]'),leaf['itemID']]
-            item = self.editedTree.insert('',tk.END,values=values)
-            print(values)
-        if self.editLeafDict=={}:
-            return False
-        self.editIndex = max(list(self.editLeafDict.keys())) + 1
-        self.currentLeaf = None
-        self.filePathE.config(state='normal')
-        clearFrame(self.itemEditFrame)
-        self.filePathE.config(state='readonly')
-        #print(self.editLeafDict)
-
-    def remove_selected_item(self):
-        selectedItem = self.editedTree.selection()
-        editID = self.editedTree.item(selectedItem)['values'][0]
-        self.editedTree.delete(selectedItem)
-        if self.editLeafDict.get(editID) is not None:
-            self.editLeafDict.pop(editID)
 
     def read_and_save_file_edit(self):
         if self.currentLeaf is None:
@@ -1862,49 +1586,10 @@ class PvfeditequipmentframeWidget(ttk.Frame):
         else:
             jsoneditor.open_browser(self.currentLeaf['jsonEditorServer'].port,False)
     
-    def getItemPVFInfo(self,blankString='')->str:
-            if self.idE.get()=='':
-                res = blankString
-                return res
-            try:
-                itemID = int(self.idE.get())
-            except:
-                return '请输入整数ID'
-            res = cacheM.get_Item_Info_In_Text(itemID).replace(r'%%',r'%').strip()
-            return res
-    
-    def readItemID(self,name_id='id'):
-            if name_id=='id':
-                id_ = self.idE.get()
-                try:
-                    id_ = int(id_)
-                except:
-                    id_ = 0
-                name = str(cacheM.ITEMS_dict.get(int(id_)))
-            else:
-                id_,name = self.searchNameE.get().split(' ',1)
-                id_ = id_[1:-1]
-                
-            self.idE.delete(0,tk.END)
-            self.idE.insert(0,id_)
-            self.searchNameE.delete(0,tk.END)
-            self.searchNameE.insert(0,name)
-            self.searchNameE.config(values=[])
-            print(name,id_)
-
-    def searchItem(self,e:tk.Event):
-            '''搜索物品名'''
-            if e.x<100:return
-            key = self.searchNameE.get()
-            if len(key)>0:
-                res = cacheM.searchItem(key,itemList=cacheM.equipmentDict.items())
-                self.searchNameE.config(values=[str([item[0]])+' '+item[1] for item in res])
-
 class PvfeditmainframeApp:
-    def __init__(self, master=None, onSubmitBag=None, onSubmitMail=None, onLoadEdit=None, logFunc=None):
+    def __init__(self, master=None, onSubmitBag=None, onSubmitMail=None, logFunc=None):
         self.onSubmitBag = onSubmitBag
         self.onSubmitMail = onSubmitMail
-        self.onLoadEdit = onLoadEdit
         self.logFunc = logFunc    # 日志转发到主程序（None 时打印）
         # build ui
         frame1 = ttk.Frame(master)
@@ -1966,13 +1651,13 @@ class PvfeditmainframeApp:
 
     def _other_build_functions(self):
         def _build_stk_tab():
-            widget = PvfeditstackableframeWidget(self.tabView,onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail,onLoadEdit=self.onLoadEdit)
+            widget = PvfeditstackableframeWidget(self.tabView,onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail)
             widget.pack(expand=True, fill="both")
             self.tabView.add(widget,text=' 道具 ')
             widget.log = self.log
             return widget
         def _build_equ_tab():
-            widget = PvfeditequipmentframeWidget(self.tabView,onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail,onLoadEdit=self.onLoadEdit)
+            widget = PvfeditequipmentframeWidget(self.tabView,onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail)
             widget.pack(expand=True, fill="both")
             self.tabView.add(widget,text=' 装备 ')
             widget.log = self.log
@@ -2019,16 +1704,11 @@ class PvfeditmainframeApp:
                 self.lstDict['stackable'] = LstEditor(pvf.read_File_In_Decrypted_Bin(stkLstPath),pvf.stringTable,baseDir='stackable',suffix='.stk')
                 self.stkTab.lst = self.lstDict['stackable']
                 self.stkTab.pvf = pvf
-                self.stkTab.searchNameE.delete(0,tk.END)
-                self.stkTab.searchNameE.insert(0,f'输入关键词检索道具({len(cacheM.stackableDict.items())})')
-                self.stkTab.enable_Btns()
 
                 equLstPath = 'equipment/equipment.lst'
                 self.lstDict['equipment'] = LstEditor(pvf.read_File_In_Decrypted_Bin(equLstPath),pvf.stringTable,baseDir='equipment',suffix='.equ')
                 self.equTab.lst = self.lstDict['equipment']
                 self.equTab.pvf = pvf
-                self.equTab.searchNameE.delete(0,tk.END)
-                self.equTab.searchNameE.insert(0,f'输入关键词检索装备({len(cacheM.equipmentDict.items())})')
                 self.equTab.update_with_PVF()
 
                 self.etcTab.pvf = pvf
@@ -2059,9 +1739,9 @@ class PvfeditmainframeApp:
             fileInCompressedJson = f.read()
         editLeafs = pickle.loads(zlib.decompress(fileInCompressedJson))
         self.stkTab.editLeafDict = editLeafs['stackable']
-        self.stkTab.refill_treeview()
+        self.stkTab.editIndex = max(self.stkTab.editLeafDict, default=-1) + 1
         self.equTab.editLeafDict = editLeafs['equipment']
-        self.equTab.refill_treeview()
+        self.equTab.editIndex = max(self.equTab.editLeafDict, default=-1) + 1
         self.etcTab.editLeafDict = editLeafs['etc']
         self.etcTab.update_Edited_Box()
         

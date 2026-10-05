@@ -212,10 +212,6 @@ class GuiAppTabMain:
 
 
     def _buildtab_itemTab(self,itemEditFrame:itemSlotFrame.ItemslotframeWidget,tabName):
-        #登记各背包子页签的"修改物品"控件，供搜索面板的"载入修改"直接填进来
-        if not hasattr(self,'itemEditFrameDict'):
-            self.itemEditFrameDict = {}
-        self.itemEditFrameDict[tabName] = itemEditFrame
         def ask_commit():
             if showSelectedItemInfo()!=True or self.cNo==0:
                 return False

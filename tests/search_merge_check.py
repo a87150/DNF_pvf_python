@@ -1,49 +1,59 @@
-# 搜索合并自检：搜索面板的"载入修改"必须能直接填进背包的修改物品控件
+# 搜索合并自检：左侧 = 一个搜索栏 + 一个结果列表 + 四个按钮
+# 四个按钮依次为 提交编辑 -> 提交邮件 -> 修改物品数据 -> 以该物品为模板
 import sys, os, tkinter as tk
+from tkinter import ttk
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dnfpkgtool import pvfEditorGUI as E
-import dnfpkgtool.__main__ as M
 
-def check(name, cond):
-    print(('PASS  ' if cond else 'FAIL  ') + name)
+EXPECTED = ['提交编辑', '提交邮件', '修改物品数据', '以该物品为模板']
+
+def check(name, cond, extra=''):
+    print(('PASS  ' if cond else 'FAIL  ') + name + (f'  {extra}' if extra else ''))
     if not cond:
         sys.exit(1)
 
 root = tk.Tk(); root.withdraw()
-hits = []
-panel = E.ItemSearchPanel(root, isEquipment=False,
-                          onLoadEdit=hits.append,
-                          onSubmitBag=lambda i: None, onSubmitMail=lambda i: None)
+hits = {}
+def record(key):
+    return lambda itemID: hits.setdefault(key, []).append(itemID)
 
-def texts(w, out=None):
+panel = E.ItemSearchPanel(root, isEquipment=False,
+                          onSubmitBag=record('bag'), onSubmitMail=record('mail'),
+                          onEditData=record('edit'), onTemplate=record('tpl'))
+
+def buttons(w, out=None):
     out = [] if out is None else out
     for c in w.winfo_children():
-        try:
-            if 'text' in c.keys():
-                out.append(c.cget('text'))
-        except Exception:
-            pass
-        texts(c, out)
+        if isinstance(c, ttk.Button):
+            out.append(c)
+        buttons(c, out)
     return out
 
-btns = texts(panel)
-check('搜索面板有"修改物品数据"按钮', '修改物品数据' in btns)
-check('三个按钮都在(提交编辑/提交邮件/修改物品数据)', all(t in btns for t in ('提交编辑', '提交邮件', '修改物品数据')))
-check('按钮顺序为 提交编辑->提交邮件->修改物品数据', [t for t in btns if t in ('提交编辑', '提交邮件', '修改物品数据')] == ['提交编辑', '提交邮件', '修改物品数据'])
-check('onLoadEdit 已保存', panel.onLoadEdit is not None)
+btns = buttons(panel)
+texts = [b.cget('text') for b in btns]
+check('四个按钮都在(提交编辑/提交邮件/修改物品数据/以该物品为模板)', all(t in texts for t in EXPECTED))
+check('按钮顺序为 提交编辑->提交邮件->修改物品数据->以该物品为模板',
+      [t for t in texts if t in EXPECTED] == EXPECTED)
+check('onEditData 已保存', panel.onEditData is not None)
+check('onTemplate 已保存', panel.onTemplate is not None)
+check('旧参数 onLoadEdit 已删除', not hasattr(panel, 'onLoadEdit'))
+
 panel.selected_ID = lambda: 777          # 模拟选中结果
-panel._submit(panel.onLoadEdit)
-check('点按钮会把选中物品ID交给回调', hits == [777])
-panel.selected_ID = lambda: None
-panel.onLoadEdit = None
-panel._submit(panel.onLoadEdit)          # 没回调也不能炸
+for b in btns:
+    b.invoke()
+check('点四个按钮把选中物品ID交给各自回调',
+      [hits.get(k) for k in ('bag', 'mail', 'edit', 'tpl')] == [[777]] * 4, str(hits))
+
+panel.selected_ID = lambda: None         # 未选中
+for b in btns:
+    b.invoke()
+check('selected_ID 返回 None 时点按钮不炸', True)
+
+for key in ('onSubmitBag', 'onSubmitMail', 'onEditData', 'onTemplate'):
+    setattr(panel, key, None)
+for b in btns:
+    b.invoke()
 check('无回调时安全', True)
 
-check('主窗口实现了 submit_Search_to_Edit', hasattr(M.GuiApp, 'submit_Search_to_Edit'))
-src1 = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'dnfpkgtool', 'guiActions.py'), 'rb').read().decode('utf-8')
-src2 = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'dnfpkgtool', 'guiTabMain.py'), 'rb').read().decode('utf-8')
-check('编辑器打开时传入了 onLoadEdit', 'onLoadEdit=self.submit_Search_to_Edit' in src1)
-check('物品编辑控件已按页签登记', 'itemEditFrameDict[tabName] = itemEditFrame' in src2)
-check('载入修改会写入物品ID/名称', 'itemEditFrame.itemIDEntry.insert(0,itemID)' in src1 and 'itemEditFrame.itemNameEntry.insert' in src1)
 root.destroy()
 print('SEARCH_MERGE_CHECK PASSED')
