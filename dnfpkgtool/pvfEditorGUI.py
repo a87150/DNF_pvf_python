@@ -403,13 +403,14 @@ def _avatar_Rarity_Suffix(fileInDict:dict):
 class ItemSearchPanel(ttk.Labelframe):
     """筛选条件 + 结果树 + 提交（道具/装备两个 tab 共用）。
     isEquipment=True 时加装备三级分类，并按装备规则筛选（等级不归一、稀有度补'时装'）。"""
-    def __init__(self,master,isEquipment=False,onPick=None,onSubmitBag=None,onSubmitMail=None,**kw):
+    def __init__(self,master,isEquipment=False,onPick=None,onSubmitBag=None,onSubmitMail=None,onLoadEdit=None,**kw):
         kw.setdefault('text','搜索')
         super(ItemSearchPanel,self).__init__(master,**kw)
         self.isEquipment = isEquipment
         self.onPick = onPick
         self.onSubmitBag = onSubmitBag
         self.onSubmitMail = onSubmitMail
+        self.onLoadEdit = onLoadEdit   #载入到背包页签的"修改物品"控件（搜索与修改共用同一处搜索）
         row0 = ttk.Frame(self)
         row0.pack(fill='x',side='top')
         ttk.Label(row0,text='关键词',width=6).pack(side='left')
@@ -468,6 +469,7 @@ class ItemSearchPanel(ttk.Labelframe):
         btnFrame = ttk.Frame(self)
         btnFrame.pack(fill='x',side='top',pady=2)
         ttk.Button(btnFrame,text='提交编辑',command=lambda:self._submit(self.onSubmitBag)).pack(expand=True,fill='x',side='left')
+        ttk.Button(btnFrame,text='载入修改',command=lambda:self._submit(self.onLoadEdit)).pack(expand=True,fill='x',side='left')
         ttk.Button(btnFrame,text='提交邮件',command=lambda:self._submit(self.onSubmitMail)).pack(expand=True,fill='x',side='right')
 
     def _load_Types(self):
@@ -590,10 +592,11 @@ class ItemSearchPanel(ttk.Labelframe):
 
 
 class PvfeditstackableframeWidget(ttk.Frame):
-    def __init__(self, master=None, onSubmitBag=None, onSubmitMail=None, **kw):
+    def __init__(self, master=None, onSubmitBag=None, onSubmitMail=None, onLoadEdit=None, **kw):
         super(PvfeditstackableframeWidget, self).__init__(master, **kw)
         self.onSubmitBag = onSubmitBag
         self.onSubmitMail = onSubmitMail
+        self.onLoadEdit = onLoadEdit
         self.leftColumn = ttk.Frame(self)
         self.editedListFrame = ttk.Labelframe(self.leftColumn)
         self.editedListFrame.configure(height=200, text='已编辑列表', width=300)
@@ -632,7 +635,7 @@ class PvfeditstackableframeWidget(ttk.Frame):
         self.delLeafBtn.pack(fill="x", side="top")
         self.delLeafBtn.configure(command=self.remove_selected_item)
         self.treeViewBtnFrame.pack(fill="x", side="top")
-        self.searchPanel = ItemSearchPanel(self.leftColumn,isEquipment=False,
+        self.searchPanel = ItemSearchPanel(self.leftColumn,isEquipment=False,onLoadEdit=self.onLoadEdit,
                                            onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail)
         self.searchPanel.pack(expand="true", fill="both", side="top")
         self.editedListFrame.pack(expand="true", fill="both", side="top")
@@ -1087,10 +1090,11 @@ class PvfeditstackableframeWidget(ttk.Frame):
                 self.searchNameE.config(values=[str([item[0]])+' '+item[1] for item in res])
 
 class PvfeditequipmentframeWidget(ttk.Frame):
-    def __init__(self, master=None, onSubmitBag=None, onSubmitMail=None, **kw):
+    def __init__(self, master=None, onSubmitBag=None, onSubmitMail=None, onLoadEdit=None, **kw):
         super(PvfeditequipmentframeWidget, self).__init__(master, **kw)
         self.onSubmitBag = onSubmitBag
         self.onSubmitMail = onSubmitMail
+        self.onLoadEdit = onLoadEdit
         self.leftColumn = ttk.Frame(self)
         self.editedListFrame = ttk.Labelframe(self.leftColumn)
         self.editedListFrame.configure(height=200, text='已编辑列表', width=200)
@@ -1129,7 +1133,7 @@ class PvfeditequipmentframeWidget(ttk.Frame):
         self.delLeafBtn.pack(fill="x", side="top")
         self.delLeafBtn.configure(command=self.remove_selected_item)
         self.treeViewBtnFrame.pack(fill="x", side="top")
-        self.searchPanel = ItemSearchPanel(self.leftColumn,isEquipment=True,
+        self.searchPanel = ItemSearchPanel(self.leftColumn,isEquipment=True,onLoadEdit=self.onLoadEdit,
                                            onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail)
         self.searchPanel.pack(expand="true", fill="both", side="top")
         self.editedListFrame.pack(expand="true", fill="both", side="top")
@@ -1897,9 +1901,10 @@ class PvfeditequipmentframeWidget(ttk.Frame):
                 self.searchNameE.config(values=[str([item[0]])+' '+item[1] for item in res])
 
 class PvfeditmainframeApp:
-    def __init__(self, master=None, onSubmitBag=None, onSubmitMail=None, logFunc=None):
+    def __init__(self, master=None, onSubmitBag=None, onSubmitMail=None, onLoadEdit=None, logFunc=None):
         self.onSubmitBag = onSubmitBag
         self.onSubmitMail = onSubmitMail
+        self.onLoadEdit = onLoadEdit
         self.logFunc = logFunc    # 日志转发到主程序（None 时打印）
         # build ui
         frame1 = ttk.Frame(master)
@@ -1961,13 +1966,13 @@ class PvfeditmainframeApp:
 
     def _other_build_functions(self):
         def _build_stk_tab():
-            widget = PvfeditstackableframeWidget(self.tabView,onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail)
+            widget = PvfeditstackableframeWidget(self.tabView,onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail,onLoadEdit=self.onLoadEdit)
             widget.pack(expand=True, fill="both")
             self.tabView.add(widget,text=' 道具 ')
             widget.log = self.log
             return widget
         def _build_equ_tab():
-            widget = PvfeditequipmentframeWidget(self.tabView,onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail)
+            widget = PvfeditequipmentframeWidget(self.tabView,onSubmitBag=self.onSubmitBag,onSubmitMail=self.onSubmitMail,onLoadEdit=self.onLoadEdit)
             widget.pack(expand=True, fill="both")
             self.tabView.add(widget,text=' 装备 ')
             widget.log = self.log
