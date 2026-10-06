@@ -183,3 +183,6 @@ dnf/
 - 上游原版：[Zageku/DNF_pvf_python](https://github.com/Zageku/DNF_pvf_python)
 - 本仓库（fork）：[a87150/DNF_pvf_python](https://github.com/a87150/DNF_pvf_python)
 - 尊重原作者版权与致谢；本 fork 的改动集中在结构精简、打包与编码修复、界面调整，详见「升级改动清单」。
+
+- **本地配置不入库**：`config/config.json` 已从 git 移除（此前被 `git checkout` 覆盖过一次，导致连不上库）；新环境把 `config/config.example.json` 复制成 `config/config.json` 再填自己的地址。
+

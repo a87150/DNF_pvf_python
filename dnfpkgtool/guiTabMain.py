@@ -55,11 +55,11 @@ class GuiAppTabMain:
         @inThread
         def selectCharac(showTitle=False):
             
-            if len(self.characTreeV.selection())==0:return
+            if len(runOnUi(self.characTreeV.selection))==0:return
             taskID = len(self.loadPkgTaskList)
             self.loadPkgTaskList.append(taskID)
             self.fillingFlg = True
-            sel = self.characTreeV.item(self.characTreeV.selection()[0])['values']
+            sel = runOnUi(self.characTreeV.item,runOnUi(self.characTreeV.selection)[0])['values']
             try:
                 cNo, cName, lev, job, uid = sel
             except:
@@ -98,11 +98,11 @@ class GuiAppTabMain:
             self.uid = uid
             self.lev = lev
             self.inventory_capacity = inventory_capacity
-            self.invCapacityE.set(f'{inventory_capacity}')
+            runOnUi(self.invCapacityE.set,f'{inventory_capacity}')
             self.globalCharacNonBlobs = nonBlobItemsDict
             self.importFlgDict = {}
             #print('填充treev')
-            self.w.after(1,lambda:self.fill_tab_treeviews(taskID))
+            runOnUi(self.w.after,1,lambda:self.fill_tab_treeviews(taskID))
             self.fill_charac_tab_fun()
             while self.fillingFlg and len(self.loadPkgTaskList)==taskID+1:
                 time.sleep(0.01)
@@ -116,24 +116,24 @@ class GuiAppTabMain:
                 nonlocal pvfPath
                 print('数据源加载中...PVF：',pvfPath)
                 if cacheM.config.get('PVF_PATH')== '':
-                    messagebox.showinfo('PVF 文件位置','PVF 文件（Script.pvf）在服务器上的路径：\n/home/neople/game/Script.pvf\n\n请先把该文件下载到本机，再选择打开。')
+                    runOnUi(messagebox.showinfo,'PVF 文件位置','PVF 文件（Script.pvf）在服务器上的路径：\n/home/neople/game/Script.pvf\n\n请先把该文件下载到本机，再选择打开。')
                 if self.PVF_LOADING_FLG:
                     print('等待PVF加载')
                     return False
                 if pvfPath=='':
-                    pvfPath = askopenfilename(filetypes=[('DNF Script.pvf file','*.pvf')])
+                    pvfPath = runOnUi(askopenfilename,filetypes=[('DNF Script.pvf file','*.pvf')])
                 if pvfPath!='':
                     cacheM.pvfReader.LOAD_FUNC = cacheM.pvfReader.get_Item_Dict
                     t1 = time.time()
                     print('加载PVF中...')
                     self.PVF_LOADING_FLG = True
                     try:
-                        info = cacheM.loadItems2(True,pvfPath,encode=self.PVFEncodeE.get())
+                        info = cacheM.loadItems2(True,pvfPath,encode=runOnUi(self.PVFEncodeE.get))
                     except Exception as e:      #加载线程里的异常原本没人看得到，这里记进全局日志
                         self.PVF_LOADING_FLG = False
                         import traceback
                         log('PVF加载失败：%s' % traceback.format_exc())
-                        messagebox.showerror('PVF加载失败', traceback.format_exc()[-800:])
+                        runOnUi(messagebox.showerror,'PVF加载失败', traceback.format_exc()[-800:])
                         return False
                     self.PVF_LOADING_FLG = False
                     t = time.time() - t1 
@@ -141,33 +141,33 @@ class GuiAppTabMain:
                     if MD5 is None:
                         return False
                     info += '  花费时间%.2fs' % t
-                    self.PVFCacheE.set(f'{cacheM.tinyCache[MD5].get("nickName")}-{MD5}')
-                    self.PVFEncodeE.set(cacheM.tinyCache[MD5].get("encode"))
+                    runOnUi(self.PVFCacheE.set,f'{cacheM.tinyCache[MD5].get("nickName")}-{MD5}')
+                    runOnUi(self.PVFEncodeE.set,cacheM.tinyCache[MD5].get("encode"))
 
                     # 更新魔法封印框、时装潜能框和职业框
                     if cacheM.magicSealDict.get(0) is None:
                         cacheM.magicSealDict[0] = ''
-                    [func() for func in self.updateMagicSealFuncs.values()]
-                    self.hiddenCom.config(values=['0-None']+[f'{i+1}-{value}' for i,value in enumerate(cacheM.avatarHiddenList[0])])
-                    self.jobE.config(values=[f'{item[0]}-{item[1][0]}'  for item in cacheM.jobDict.items()])
-                    self.jobE.set('')
+                    runOnUi(lambda:[func() for func in self.updateMagicSealFuncs.values()])
+                    runOnUi(self.hiddenCom.config,values=['0-None']+[f'{i+1}-{value}' for i,value in enumerate(cacheM.avatarHiddenList[0])])
+                    runOnUi(self.jobE.config,values=[f'{item[0]}-{item[1][0]}'  for item in cacheM.jobDict.items()])
+                    runOnUi(self.jobE.set,'')
 
                     PVFres = []
                     for MD5,infoDict in list(cacheM.cacheManager.tinyCache.items()):
                         if not isinstance(infoDict,dict):continue
                         PVFres.append(f'{cacheM.cacheManager.tinyCache[MD5]["nickName"]}-{MD5}')
-                    self.PVFCacheE.config(values=PVFres)
+                    runOnUi(self.PVFCacheE.config,values=PVFres)
                     enhanceTypes = list(cacheM.enhanceDict_zh.keys())
                     for orbTypeE in self.orbTypeEList:
-                        orbTypeE.config(values=enhanceTypes)
+                        runOnUi(orbTypeE.config,values=enhanceTypes)
 
                     if self.PVF_CACHE_EDIT_OPEN_FLG:
-                        self.PVFEditWinFrame.fillTree()
+                        runOnUi(self.PVFEditWinFrame.fillTree)
                     print(info)
                 else:
                     print('PVF路径为空，加载CSV')
                     cacheM.loadItems2(False)
-                    self.PVFCacheE.set('使用CSV')
+                    runOnUi(self.PVFCacheE.set,'使用CSV')
                 selectCharac()
             t = threading.Thread(target=inner)
             t.daemon = True
@@ -397,12 +397,13 @@ class GuiAppTabMain:
             
         @inThread
         def set_inv_capacity(event=None):
-            capacity = int(itemEditFrame.inv_capacityE.get())
+            capacity = int(runOnUi(itemEditFrame.inv_capacityE.get))
             sql = f'update inventory set inventory_capacity={capacity} where charac_no={self.cNo}'
             sqlM.execute_commit('taiwan_cain_2nd',sql)
             self.inventory_capacity = capacity
+            # checkBloblegal 纯数据不动控件；set_treeview_color 里全是控件操作，交回主线程
             self.checkBloblegal()
-            set_treeview_color()
+            runOnUi(set_treeview_color)
             print(f'修改背包容量为{capacity}')
 
         def getItemPVFInfo()->str:

@@ -451,7 +451,7 @@ class GuiAppTabGM:
             @inThread
             def clearAllMail():
                 allPostalID = sqlM.get_all_postalID()
-                if not messagebox.askokcancel('发送确认',f'确定清空当前所有的{len(allPostalID)}封邮件？'):
+                if not runOnUi(messagebox.askokcancel,'发送确认',f'确定清空当前所有的{len(allPostalID)}封邮件？'):
                     return False
                 i = 1
                 for postalID in allPostalID:
@@ -615,8 +615,8 @@ class GuiAppTabGM:
         buildTab_mail()
         self.update_event_list_func = buildTab_event()
 
-    @inThread
     def _buildTab_bubble(self):
+        # 改同步：这是建泡点页签控件的函数，控件只能建在主线程；里面那条 get_online_uid() 只是查询
         bubbleUserTamplete = {
             'value':10,
             'interval':1,
@@ -787,6 +787,7 @@ class GuiAppTabGM:
                     if uid not in onlineUIDs.keys():
                         onlineDict.pop(uid)
                 uidBubbleValueDict = {uid:{'bubbles':[],'value':0} for uid in onlineUIDs.keys()}
+                ignorePrivate = runOnUi(self.privateIPVar.get)==0   # IntVar 只能在主线程读
                 for bubbleID,bubbleIDDict in cacheM.config.get('BUBBLE').items():
                     bubbleName = bubbleID #if not isinstance(bubbleID,int) else f'泡点{bubbleID}'
                     if bubbleIDDict['enable']==0:
@@ -802,7 +803,7 @@ class GuiAppTabGM:
                         if bubbleIDDict.get('uids') is not None:
                             if uid not in bubbleIDDict['uids']:
                                 continue
-                        if self.privateIPVar.get()==0 and ipaddress.ip_address(onlineUIDs[uid]).is_private:
+                        if ignorePrivate and ipaddress.ip_address(onlineUIDs[uid]).is_private:
                             continue
                         if timeNow==onlineDict[uid]:
                             continue

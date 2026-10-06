@@ -217,10 +217,9 @@ class GuiAppActions:
     def openPVF(self):
         self.load_PVF('')
 
-    @inThread
     def selectCharac(self, event=None):
-        t = self.selectCharac_(True)
-        t.join()
+        # selectCharac_ 本身就是 @inThread，不必再套一层线程 + join（原来只是白等一层）
+        return self.selectCharac_(True)
     def change_TabView(self, e=None):
         for func in self.tabViewChangeFuncs:
             func(e)
@@ -235,7 +234,7 @@ class GuiAppActions:
     def get_online_num(self):
         while True:
             try:
-                if self.onlineNumVar.get()==0:
+                if runOnUi(self.onlineNumVar.get)==0:
                     self.titleString = f'背包编辑工具 - [在线人数实时更新已关闭][泡点已关闭]'
                     time.sleep(5)
                     continue
@@ -268,12 +267,13 @@ class GuiAppActions:
         for db in self.db_list:
             if db in allDB:
                 self.db_avaliable.append(db)
-        self.remoteSqlTree.delete(*self.remoteSqlTree.get_children())
+        # fill_db_bak 由 connectSQL 的后台线程调用，控件更新回主线程
+        runOnUi(self.remoteSqlTree.delete,*runOnUi(self.remoteSqlTree.get_children))
         for db in self.db_avaliable:
-            self.remoteSqlTree.insert('',tk.END,values=[db,'未备份'])
+            runOnUi(self.remoteSqlTree.insert,'',tk.END,values=[db,'未备份'])
 
-    @inThread
     def init_db(self):
+        # 改同步：只有 os.listdir + 填树，很快；真正的还原仍由 self.restore_sel_db()（@inThread）在后台跑
         bakPath = 'sql_bak/初始数据库'
         if not messagebox.askokcancel('初始化确认','确认初始化数据库？当前数据库中所有存档将被清空，仅保留运行所需数据！'):
             return False
@@ -313,28 +313,28 @@ class GuiAppActions:
                         self.remoteSqlTree.item(line,values=[db,f'备份完成({bakNum})'])
         bakPath = 'sql_bak'
         dateStr = datetime.datetime.now().strftime('%Y-%m-%d')
-        bakPath = os.path.join(bakPath,self.db_ipE.get()+f'_{dateStr}')
+        bakPath = os.path.join(bakPath,runOnUi(self.db_ipE.get)+f'_{dateStr}')
         if not os.path.exists(bakPath):
             os.makedirs(bakPath)
-        sels = self.remoteSqlTree.selection()
+        sels = runOnUi(self.remoteSqlTree.selection)
         selDBList = []
         for sel in sels:
-            selDBList.append(self.remoteSqlTree.item(sel)['values'][0])
-        if not messagebox.askokcancel('确认备份',f'确认备份选中的{len(selDBList)}个数据库？{selDBList}？\n数据库将被被分到目录{bakPath}下'):
+            selDBList.append(runOnUi(self.remoteSqlTree.item,sel)['values'][0])
+        if not runOnUi(messagebox.askokcancel,'确认备份',f'确认备份选中的{len(selDBList)}个数据库？{selDBList}？\n数据库将被被分到目录{bakPath}下'):
             return False
         
         if sqlM.bak_db_num != sqlM.total_bak_db_num:
-            messagebox.showerror('功能正忙','请等待当前备份任务结束')
+            runOnUi(messagebox.showerror,'功能正忙','请等待当前备份任务结束')
             return False
         sqlM.bak_db_num = 0
         sqlM.total_bak_db_num = len(selDBList)
         for db in selDBList:
             sqlM.backup_db(db,bakPath)
         while sqlM.total_bak_db_num>sqlM.bak_db_num:
-            read_bak_stat()
+            runOnUi(read_bak_stat)
             time.sleep(1)
-        read_bak_stat()
-        messagebox.showinfo('备份完成',f'备份完成，共备份{sqlM.total_bak_db_num}个数据库')
+        runOnUi(read_bak_stat)
+        runOnUi(messagebox.showinfo,'备份完成',f'备份完成，共备份{sqlM.total_bak_db_num}个数据库')
     
 
     def open_db_bak_dir(self):
@@ -367,25 +367,25 @@ class GuiAppActions:
                         self.localSqlTree.item(line,values=[db,f'等待还原'])
                     else:
                         self.localSqlTree.item(line,values=[db,f'还原完成({restoredNum})'])
-        sels = self.localSqlTree.selection()
+        sels = runOnUi(self.localSqlTree.selection)
         selDBList = []
         for sel in sels:
-            selDBList.append(self.localSqlTree.item(sel)['values'][0])
-        if not messagebox.askokcancel('确认还原',f'确认还原选中的{len(selDBList)}个数据库？\n请停止游戏服务端并关闭其他链接以保证还原正常进行。\n{selDBList}'):
+            selDBList.append(runOnUi(self.localSqlTree.item,sel)['values'][0])
+        if not runOnUi(messagebox.askokcancel,'确认还原',f'确认还原选中的{len(selDBList)}个数据库？\n请停止游戏服务端并关闭其他链接以保证还原正常进行。\n{selDBList}'):
             return False
         if sqlM.restore_db_num != sqlM.total_restore_db_num:
-            messagebox.showerror('功能正忙','请等待当前还原任务结束')
+            runOnUi(messagebox.showerror,'功能正忙','请等待当前还原任务结束')
             return False
         sqlM.restore_db_num = 0
         sqlM.total_restore_db_num = len(selDBList)
         for db in selDBList:
             sqlM.restore_db(db,self.bakPath)
         while sqlM.total_restore_db_num>sqlM.restore_db_num:
-            read_restore_stat()
+            runOnUi(read_restore_stat)
             time.sleep(0.3)
-            self.mainFrame.update()
+            runOnUi(self.mainFrame.update)
 
-        read_restore_stat()
-        messagebox.showinfo('还原完成',f'还原完成，共还原{sqlM.total_restore_db_num}个数据库')
+        runOnUi(read_restore_stat)
+        runOnUi(messagebox.showinfo,'还原完成',f'还原完成，共还原{sqlM.total_restore_db_num}个数据库')
         
 

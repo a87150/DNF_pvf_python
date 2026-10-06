@@ -12,19 +12,19 @@ class GuiAppTabSsh:
                         self.transPort.close()
                     except:
                         pass
-                ip = ipE.get()
-                port = int(portE.get())
-                user = userE.get()
+                ip = runOnUi(ipE.get)
+                port = int(runOnUi(portE.get))
+                user = runOnUi(userE.get)
                 self.connectingFlg = True
                 if key:
-                    keyPath = askopenfilename(filetypes=[('密钥文件','*.pub'),('所有文件','*.*')])
+                    keyPath = runOnUi(askopenfilename,filetypes=[('密钥文件','*.pub'),('所有文件','*.*')])
                     if not keyPath:
                         return False
                     
                     try:
                         private_key  = paramiko.RSAKey.from_private_key_file(keyPath)
                     except Exception as e:
-                        messagebox.showerror('错误',f'密钥文件错误{e}')
+                        runOnUi(messagebox.showerror,'错误',f'密钥文件错误{e}')
                         return False
                     try:
                         ssh.connect(ip, username=user, port=port, pkey=private_key,timeout=3)
@@ -33,13 +33,13 @@ class GuiAppTabSsh:
                     except Exception as e:
                         if show:
                             print(f'连接失败 {e}')
-                            self.title(f'连接失败 {e}')
+                            runOnUi(self.title,f'连接失败 {e}')
                         self.connectedFlg = False
                         self.connectingFlg = False
                         return False
                     cacheM.config['SERVER_PWD'] = ''
                 else:
-                    pwd = pwdE.get()
+                    pwd = runOnUi(pwdE.get)
                     try:
                         ssh.connect(ip, username=user, port=port, password=pwd,timeout=3)
                         self.transPort = paramiko.Transport((ip,port))
@@ -48,7 +48,7 @@ class GuiAppTabSsh:
                     except Exception as e:
                         if show:
                             print(f'连接失败 {e}')
-                            self.title(f'连接失败 {e}')
+                            runOnUi(self.title,f'连接失败 {e}')
                         self.connectedFlg = False
                         self.connectingFlg = False
                         return False
@@ -61,12 +61,12 @@ class GuiAppTabSsh:
                 ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command("ls /root")
                 files = ['sh '+item.strip() for item in ssh_stdout.readlines()]
                 for fileSelE in fileSelEList:
-                    fileSelE.config(values=files)
+                    runOnUi(fileSelE.config,values=files)
                 self.connectedFlg = True
                 #self.ip = ip
-                self.title('服务器已连接！')
+                runOnUi(self.title,'服务器已连接！')
                 self.connectingFlg = False
-                configFrame(self.SSHDIYFrame,'normal')
+                runOnUi(configFrame,self.SSHDIYFrame,'normal')
             t = threading.Thread(target = inner)
             t.daemon = True
             t.start()        
@@ -99,13 +99,13 @@ class GuiAppTabSsh:
             def inner():
                 nonlocal startingFlg
                 startingFlg = False
-                self.title('指令执行中...')
+                runOnUi(self.title,'指令执行中...')
                 ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command("sh /root/stop")
                 ssh_stdout.readlines()
                 ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command("sh /root/stop")
                 ssh_stdout.readlines()
                 print('服务器已停止')
-                self.title('服务器已停止')
+                runOnUi(self.title,'服务器已停止')
             t = threading.Thread(target=inner)
             t.daemon = True
             t.start()
@@ -116,9 +116,10 @@ class GuiAppTabSsh:
         def insert2cmdLog(s:str):
             #self.shellLogE.config(state='normal')
             s = s+ '\n' if s[-1]!='\n' else s
-            self.shellLogE.insert(tk.END,s)
+            # 由 run_server / run_cmd 的后台线程调用，控件写入回主线程
+            runOnUi(self.shellLogE.insert,tk.END,s)
             #self.shellLogE.config(state='disable')
-            self.shellLogE.see(tk.END)
+            runOnUi(self.shellLogE.see,tk.END)
 
         def run_file(fileName):
             def inner():
@@ -128,8 +129,8 @@ class GuiAppTabSsh:
                     if res == '':
                         break
                     time.sleep(0.05)
-                    self.title(res)
-                self.title(f'{fileName}执行完毕')
+                    runOnUi(self.title,res)
+                runOnUi(self.title,f'{fileName}执行完毕')
 
             t = threading.Thread(target=inner)
             t.daemon = True
@@ -138,7 +139,7 @@ class GuiAppTabSsh:
         def run_cmd(cmd='ls',endStr=None):
             def inner():
                 ssh_stdin, ssh_stdout, ssh_stderr = ssh.exec_command(cmd)
-                save_diy()
+                runOnUi(save_diy)
                 t = 0
                 while True:
                     try:
@@ -194,12 +195,12 @@ class GuiAppTabSsh:
                     nonlocal time_now
                     if time.time() - time_now>1:
                         print("Transferred: {0}\tOut of: {1}".format(transferred, toBeTransferred))
-                        self.title("%.3fM/%.3fM" % (transferred/1e6, toBeTransferred/1e6))
+                        runOnUi(self.title,"%.3fM/%.3fM" % (transferred/1e6, toBeTransferred/1e6))
                         time_now += 1
 
-                pvfPath = askopenfilename(filetypes=[('DNF Script.pvf file','*.pvf')])                
+                pvfPath = runOnUi(askopenfilename,filetypes=[('DNF Script.pvf file','*.pvf')])                
                 if pvfPath=='' or not Path(pvfPath).exists():
-                    self.title('文件错误')
+                    runOnUi(self.title,'文件错误')
                     return False
                 print(pvfPath)
                 sftp = paramiko.SFTPClient.from_transport(self.transPort)
@@ -209,17 +210,17 @@ class GuiAppTabSsh:
                 res = ssh_stdout.readlines()
                 #print(res)
                 if len(res)<5:
-                    self.title('目标文件夹异常')
+                    runOnUi(self.title,'目标文件夹异常')
                     return False
                 time_now = time.time()
                 sftp.put(pvfPath,remote_path,callback=printTotals)
-                self.title('上传完成！')
-                upPatch = messagebox.askokcancel('上传完成，是否上传等级补丁？')
+                runOnUi(self.title,'上传完成！')
+                upPatch = runOnUi(messagebox.askokcancel,'上传完成，是否上传等级补丁？')
                 if upPatch:
                     remote_path = r'/home/neople/game/df_game_r'
-                    patchPath = askopenfilename()    
+                    patchPath = runOnUi(askopenfilename)    
                     if patchPath=='':
-                        self.title('补丁文件错误')
+                        runOnUi(self.title,'补丁文件错误')
                         return False
                     sftp.put(patchPath,remote_path,callback=printTotals)
             t = threading.Thread(target=inner)
@@ -322,9 +323,9 @@ class GuiAppTabSsh:
         }
         @inThread
         def refill_baned_tree():
-            self.banedTreeV.delete(*self.banedTreeV.get_children())
             banedDict = sqlM.get_baned_Dict_detail()
             banedDictCno = {}
+            rows = []
             for uid,BanInfo in banedDict.items():
                 characs = sqlM.getCharacterInfo(uid=uid)
                 for uid_,cNo,name,lev,job,growType,deleteFlag,expert_job in characs:
@@ -339,8 +340,14 @@ class GuiAppTabSsh:
                     banedDictCno[cNo] = {
                         'uid':uid,'name':name,'job':jobNew,'lev':lev,'ip':BanInfo['ip']
                     }
-                    self.banedTreeV.insert('',tk.END,values=values)
+                    rows.append(values)
             self.banedDictCno = banedDictCno
+            # 行组好后一次性交回主线程刷控件（原来在后台线程直接 delete/insert）
+            def fill_baned_tree(rows):
+                self.banedTreeV.delete(*self.banedTreeV.get_children())
+                for values in rows:
+                    self.banedTreeV.insert('',tk.END,values=values)
+            runOnUi(fill_baned_tree,rows)
         
         def set_baned_a():
             aName = self.banAnameE.get()
@@ -531,40 +538,40 @@ class GuiAppTabSsh:
     def connectSQL(self,dbConn=None):
         def inner():
             config = cacheM.config
-            config['DB_IP'] = self.db_ipE.get()
-            config['DB_PORT'] = int(self.db_portE.get())
-            config['DB_USER'] = self.db_userE.get()
+            config['DB_IP'] = runOnUi(self.db_ipE.get)
+            config['DB_PORT'] = int(runOnUi(self.db_portE.get))
+            config['DB_USER'] = runOnUi(self.db_userE.get)
             config['PVF_PATH'] = cacheM.config.get('PVF_PATH')
-            self.mainwindow.update()
-            pwd = self.db_pwdE.get()
+            runOnUi(self.mainwindow.update)
+            pwd = runOnUi(self.db_pwdE.get)
             if pwd!='******':
                 config['DB_PWD'] = pwd
             else:
                 pwd = config['DB_PWD']
             #log(str(config))
             cacheM.config = config
-            self.db_conBTN.config(text='连接数据库',state='normal')
+            runOnUi(self.db_conBTN.config,text='连接数据库',state='normal')
             sqlresult = sqlM.connect(print,conn=dbConn)
             if '失败' not in sqlresult:  
-                self.accountSearchBtn.config(state='normal')
-                self.characSearchBtn.config(state='normal')
+                runOnUi(self.accountSearchBtn.config,state='normal')
+                runOnUi(self.characSearchBtn.config,state='normal')
                 #self.connectorE.config(values=[f'{i}-'+str(connector['account_db']) for i,connector in enumerate(sqlM.connectorAvailuableDictList)])
-                self.connectorE.config(values=[f'{i}-'+str(connector) for i,connector in enumerate(sqlM.connectorAvailuableList)])
+                runOnUi(self.connectorE.config,values=[f'{i}-'+str(connector) for i,connector in enumerate(sqlM.connectorAvailuableList)])
                 #self.connectorE.set(f"0-{sqlM.connectorAvailuableDictList[0]['account_db']}")
-                self.connectorE.set(f"0-{sqlM.connectorAvailuableList[0]}")
+                runOnUi(self.connectorE.set,f"0-{sqlM.connectorAvailuableList[0]}")
                 onlineCharacs = sqlM.get_online_charac()
-                self.fillCharac(onlineCharacs)
+                runOnUi(self.fillCharac,onlineCharacs)
                 print(f'当前在线角色已加载({len(onlineCharacs)})')
-                self.update_event_list_func()
+                runOnUi(self.update_event_list_func)
                 self.refill_baned_tree()
-                self.db_conBTN.config(text='重新连接',state='normal')
+                runOnUi(self.db_conBTN.config,text='重新连接',state='normal')
             print(sqlresult)
             self.password = pwd
             
-            self.db_pwdE.delete(0,tk.END)
+            runOnUi(self.db_pwdE.delete,0,tk.END)
             
-            self.db_pwdE.insert(0,'******')
-            CreateToolTip(self.db_conBTN,'重新连接数据库并加载在线角色列表')
+            runOnUi(self.db_pwdE.insert,0,'******')
+            runOnUi(CreateToolTip,self.db_conBTN,'重新连接数据库并加载在线角色列表')
 
             self.fill_db_bak()
             self.sqlUserManageF.get_all_users()

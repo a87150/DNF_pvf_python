@@ -187,12 +187,12 @@ class GuiAppTabCharac:
         @inThread
         def set_ban_var(e:tk.Event=None):
             time.sleep(0.3)
-            if self.isBanedUser.get()==1:
+            if runOnUi(self.isBanedUser.get)==1:
                 sqlM.set_baned(self.uid)
-                messagebox.showinfo('提示','已封禁该账号')
+                runOnUi(messagebox.showinfo,'提示','已封禁该账号')
             else:
                 sqlM.resume_baned(self.uid)
-                messagebox.showinfo('提示','已解封该账号')
+                runOnUi(messagebox.showinfo,'提示','已解封该账号')
             self.refill_baned_tree()
         
         def enable_auction(y=None,m=None):

@@ -3,15 +3,8 @@ import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import messagebox
 from . import sqlManager2 as sqlM
-import threading
-
-def inThread(func):
-    def inner(*args,**kw):
-        t = threading.Thread(target=lambda:func(*args,**kw))
-        t.daemon = True
-        t.start()
-        return t
-    return inner
+# inThread/runOnUi 统一复用 appCommon 那一份（此前这里是第 3 份拷贝）
+from dnfpkgtool.appCommon import inThread, runOnUi
 
 class SqluserframeWidget(ttk.Frame):
     def __init__(self, master=None, **kw):
@@ -82,12 +75,16 @@ class SqluserframeWidget(ttk.Frame):
 
     @inThread
     def get_all_users(self):
-        self.sqlUserTree.delete(*self.sqlUserTree.get_children())
         sql = "select user, host from mysql.user"
         users = sqlM.execute_and_fetch('mysql',sql)
+        self.allUsers = users
+        # 查询留在后台线程，控件更新交回主线程（py3.14 非主线程调控件会 RuntimeError）
+        runOnUi(self._fill_user_tree,users)
+
+    def _fill_user_tree(self,users):
+        self.sqlUserTree.delete(*self.sqlUserTree.get_children())
         for user in users:
             self.sqlUserTree.insert('', 'end', values=user)
-        self.allUsers = users
 
     def show_sel_user(self, event):
         sels = self.sqlUserTree.selection()
@@ -110,35 +107,35 @@ class SqluserframeWidget(ttk.Frame):
 
     @inThread
     def del_user(self):
-        sels = self.sqlUserTree.selection()
-        if not messagebox.askokcancel('删除用户', f'确认删除选中的{len(sels)}个用户？\n删除后可能导致无法连接数据库！'):
+        sels = runOnUi(self.sqlUserTree.selection)
+        if not runOnUi(messagebox.askokcancel,'删除用户', f'确认删除选中的{len(sels)}个用户？\n删除后可能导致无法连接数据库！'):
             return
         for sel in sels:
-            userName, host = self.sqlUserTree.item(sel)['values']
+            userName, host = runOnUi(self.sqlUserTree.item,sel)['values']
             sql = f"drop user '{userName}'@'{host}'"
             sqlM.execute_and_commit('mysql',sql)
         self.get_all_users()
         
-        messagebox.showinfo('删除用户', f'删除{len(sels)}个用户完成')
+        runOnUi(messagebox.showinfo,'删除用户', f'删除{len(sels)}个用户完成')
 
     @inThread
     def save_user(self):
         
-        userName = self.sqlUserE.get()
-        host = self.sqlUserIPE.get().split('-')[0].strip()
-        pwd = self.sqlUserPWDE.get()
+        userName = runOnUi(self.sqlUserE.get)
+        host = runOnUi(self.sqlUserIPE.get).split('-')[0].strip()
+        pwd = runOnUi(self.sqlUserPWDE.get)
         if len(pwd) < 6:
-            messagebox.showerror('保存用户', '密码长度不能少于6位')
+            runOnUi(messagebox.showerror,'保存用户', '密码长度不能少于6位')
             return
         if not userName or not host or not pwd:
-            messagebox.showerror('保存用户', '用户名、主机IP、密码不能为空')
+            runOnUi(messagebox.showerror,'保存用户', '用户名、主机IP、密码不能为空')
             return
-        sels = self.sqlUserTree.selection()
+        sels = runOnUi(self.sqlUserTree.selection)
         if not sels:    # 新建用户并赋予权限
             # 检查是否已经有同名用户
             sql = f"select user, host from mysql.user where user='{userName}' and host='{host}'"
             if sqlM.execute_and_fetch('mysql',sql):
-                messagebox.showerror('保存用户', f'已经存在用户{userName}@{host}')
+                runOnUi(messagebox.showerror,'保存用户', f'已经存在用户{userName}@{host}')
                 return
             sql = f"create user '{userName}'@'{host}' identified by '{pwd}'"
             sqlM.execute_and_commit('mysql',sql)
@@ -147,7 +144,7 @@ class SqluserframeWidget(ttk.Frame):
 
         else:   # 修改用户
             sel = sels[0]
-            oldUserName, oldHost = self.sqlUserTree.item(sel)['values']
+            oldUserName, oldHost = runOnUi(self.sqlUserTree.item,sel)['values']
             if userName != oldUserName or host != oldHost:
                 sql = f"rename user '{oldUserName}'@'{oldHost}' to '{userName}'@'{host}';"
                 sqlM.execute_and_commit('mysql',sql)
@@ -165,9 +162,9 @@ class SqluserframeWidget(ttk.Frame):
         # check if user has been created
         sql = f"select user, host from mysql.user where user='{userName}' and host='{host}'"
         if not sqlM.execute_and_fetch('mysql',sql):
-            messagebox.showerror('保存用户', f'保存用户{userName}@{host}失败')
+            runOnUi(messagebox.showerror,'保存用户', f'保存用户{userName}@{host}失败')
             return
-        messagebox.showinfo('保存完成', f'成功保存用户{userName}@{host}')
+        runOnUi(messagebox.showinfo,'保存完成', f'成功保存用户{userName}@{host}')
         
 
 

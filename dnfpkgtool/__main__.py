@@ -21,7 +21,7 @@ def run(finCallBackFunc=lambda:None,root_:tk.Tk=None):
         while True:
             if time.time()-lastTitleTimeStamp>5:
                 try:
-                    root.title(app.titleString)
+                    runOnUi(root.title,app.titleString)
                 except:
                     pass
             time.sleep(5)
@@ -30,9 +30,9 @@ def run(finCallBackFunc=lambda:None,root_:tk.Tk=None):
     def print2title(*args):
         '''输出到title和日志'''
         if len(args)==1:
-            root.title(str(args[0]))
+            runOnUi(root.title,str(args[0]))
         else:
-            root.title(str(args))
+            runOnUi(root.title,str(args))
         nonlocal lastTitleTimeStamp
         lastTitleTimeStamp = time.time()
         log(*args)    
@@ -61,6 +61,7 @@ def run(finCallBackFunc=lambda:None,root_:tk.Tk=None):
     else:
         root = root_
     
+    startUiPump(root)   # 主线程泵：必须在下面任何后台线程（resetTitle/connectSQL…）之前启动
     root.title('背包编辑工具')
     resetTitle()
 

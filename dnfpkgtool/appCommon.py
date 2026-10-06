@@ -16,6 +16,58 @@ from dnfpkgtool import avatarFrame
 from dnfpkgtool import mailFrame
 from dnfpkgtool import characFrame
 import threading
+import queue
+import traceback
+
+# ---- 主线程调度：后台线程只跑 DB/网络/耗时活，控件更新统一交回主线程 ----
+# 必须定义在下面那些 dnfpkgtool 子模块 import 之前：子模块用 from dnfpkgtool.appCommon import *
+# 取 inThread/runOnUi，appCommon 又反过来 import 它们，循环导入时这里还没执行到就会 AttributeError。
+_uiQueue = queue.Queue()
+_uiRoot = None
+
+def runOnUi(func,*args,**kw):
+    """在主线程执行 func 并返回结果。
+    主线程自己调用时直接执行；泵没启动（独立小工具）时退回原行为，直接在当前线程执行。"""
+    if _uiRoot is None or threading.current_thread() is threading.main_thread():
+        return func(*args,**kw)
+    box = [None,None]
+    done = threading.Event()
+    _uiQueue.put((func,args,kw,box,done))
+    done.wait()
+    if box[1] is not None:
+        raise box[1]
+    return box[0]
+
+def startUiPump(root):
+    """建好 root、起任何线程之前调用一次；每 30ms 在主线程清一次队列。异常打到 stderr，不吞。"""
+    global _uiRoot
+    if _uiRoot is not None:
+        return
+    _uiRoot = root
+    def pump():
+        while True:
+            try:
+                func,args,kw,box,done = _uiQueue.get_nowait()
+            except queue.Empty:
+                break
+            try:
+                box[0] = func(*args,**kw)
+            except BaseException as e:
+                box[1] = e
+                traceback.print_exc()   # 异常回抛给调用线程，同时留一份到 stderr
+            finally:
+                done.set()
+        root.after(30,pump)
+    root.after(30,pump)
+
+def inThread(func):
+    def inner(*args,**kw):
+        t = threading.Thread(target=lambda:func(*args,**kw))
+        t.daemon = True
+        t.start()
+        return t
+    return inner
+
 from dnfpkgtool import cacheManager as cacheM
 
 from dnfpkgtool import sqlManager2 as sqlM
@@ -55,14 +107,6 @@ def print(*args,**kw):
         pass
     logFunc[-1](*args,**kw)
 
-def inThread(func):
-    def inner(*args,**kw):
-        t = threading.Thread(target=lambda:func(*args,**kw))
-        t.daemon = True
-        t.start()
-        return t
-    return inner
-
 logPath = Path('log/')
 IconPath = 'config/ico.png'
 if not logPath.exists():
@@ -79,8 +123,9 @@ def log(text):
     with open(LOGFile,'a+',encoding='utf-8') as f:
         f.write(log)
     if LOG_WIDGET is not None:   #背包编辑器 + PVF 编辑器的日志都汇总到这里
-        LOG_WIDGET.insert(tk.END,log)
-        LOG_WIDGET.see(tk.END)
+        # log() 会被各后台线程调用（PVF加载、选角色、SQL连接…），控件写入回主线程
+        runOnUi(LOG_WIDGET.insert,tk.END,log)
+        runOnUi(LOG_WIDGET.see,tk.END)
 
 def str2bytes(s)->bytes:
     i = 0
