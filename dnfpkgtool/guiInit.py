@@ -944,29 +944,6 @@ class GuiAppInit:
         self.themeE.bind("<<ComboboxSelected>>", self.change_Theme, add="")
         frame7.pack(expand=True, fill="both", padx=3, side="top")
         self.otherFunctionFrame.pack(fill="y", side="left")
-        self.gitHubFrame = ttk.Frame(frame3)
-        self.gitHubFrame.configure(height=160, width=160)
-        label64 = tk.Label(
-            self.gitHubFrame,
-            text='原项目地址',
-            foreground='#0a66c2',
-            font=('微软雅黑', 9, 'underline'),
-            cursor='hand2')
-        label64.pack(anchor="w", side="top")
-        label64.bind(
-            '<Button-1>',
-            lambda e: webbrowser.open('https://github.com/Zageku/DNF_pvf_python'))
-        label65 = tk.Label(
-            self.gitHubFrame,
-            text='本项目地址',
-            foreground='#0a66c2',
-            font=('微软雅黑', 9, 'underline'),
-            cursor='hand2')
-        label65.pack(anchor="w", side="top")
-        label65.bind(
-            '<Button-1>',
-            lambda e: webbrowser.open('https://github.com/a87150/DNF_pvf_python'))
-        self.gitHubFrame.pack(side="right")
         frame34 = ttk.Frame(frame3)
         frame34.configure(height=200, width=200)
         labelframe10 = ttk.Labelframe(frame34)
@@ -1249,6 +1226,26 @@ class GuiAppInit:
             foreground="#0080ff",
             text='仅用于Python开发学习交流，请勿将本项目技术或代码应用在恶意软件制作、软件著作权/知识产权盗取或不当牟利等非法用途中。')
         label47.pack(side="top")
+        label64 = tk.Label(
+            self.aboutFrame,
+            text='原项目地址',
+            foreground='#0a66c2',
+            font=('微软雅黑', 9, 'underline'),
+            cursor='hand2')
+        label64.place(relx=0.5, rely=0.46, anchor='center')
+        label64.bind(
+            '<Button-1>',
+            lambda e: webbrowser.open('https://github.com/Zageku/DNF_pvf_python'))
+        label65 = tk.Label(
+            self.aboutFrame,
+            text='本项目地址',
+            foreground='#0a66c2',
+            font=('微软雅黑', 9, 'underline'),
+            cursor='hand2')
+        label65.place(relx=0.5, rely=0.54, anchor='center')
+        label65.bind(
+            '<Button-1>',
+            lambda e: webbrowser.open('https://github.com/a87150/DNF_pvf_python'))
         self.aboutFrame.pack(side="top")
         self.tabView.add(self.aboutFrame, text=' 关于 ')
         self.tabView.pack(expand=True, fill="both", side="top")
