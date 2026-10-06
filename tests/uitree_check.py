@@ -12,7 +12,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 import dnfpkgtool.__main__ as M
-import dnfpkgtool.gmTool_resize as G
 
 holder = {}
 _orig = M.GuiApp.__init__
@@ -51,8 +50,6 @@ def main():
         if hasattr(app, 'gitHubFrame'):
             btns = [k for k in descendants(app.gitHubFrame) if isinstance(k, tk.ttk.Button)]
             check('该容器里换成了按钮', len(btns) == 1)
-        check('GM 工具已无广告页构建函数', not hasattr(G.GMToolWindow, 'buildTab_sponsor'))
-        check('GM 构造签名已无 sponsorFrame', 'sponsorFrame' not in G.GMToolWindow.__init__.__code__.co_varnames)
         check('主窗口有全局日志区', hasattr(app, 'logTextE') and hasattr(app, 'logFrame'))
         M.log('__全局日志自检__')
         check('全局日志能收到消息', '__全局日志自检__' in app.logTextE.get('1.0', 'end'))

@@ -79,7 +79,6 @@ from dnfpkgtool.widgets.toolTip import CreateToolTip, CreateOnceToolTip, ToolTip
 from dnfpkgtool import ps
 import webbrowser
 from dnfpkgtool.widgets.titleBar import TitleBarFrame
-from dnfpkgtool import gmTool_resize as gmToolGUI
 from dnfpkgtool import pvfEditorGUI
 #from dnfpkgtool import findServerFrame
 from dnfpkgtool import questFrame
