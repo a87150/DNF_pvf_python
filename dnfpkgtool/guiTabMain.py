@@ -103,11 +103,11 @@ class GuiAppTabMain:
             self.importFlgDict = {}
             #print('填充treev')
             runOnUi(self.w.after,1,lambda:self.fill_tab_treeviews(taskID))
-            self.fill_charac_tab_fun()
+            runOnUi(self.fill_charac_tab_fun)   # 里面会写 isVIP/isReturnUser 等 Tk 变量，只能在主线程
             while self.fillingFlg and len(self.loadPkgTaskList)==taskID+1:
                 time.sleep(0.01)
                 #print(self.fillingFlg)
-            self.update_GM()
+            runOnUi(self.update_GM)   # GM 页那一堆 Tk 变量更新（点券/SP/TP…），只能在主线程
             
 
         def loadPVF(pvfPath:str=''):

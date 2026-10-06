@@ -120,9 +120,9 @@ class GuiAppTabCharac:
             if not messagebox.askokcancel('修改确认',f'确定修改角色数据信息？\n请保证账号不在线或正在登陆其他角色'):
                 return False
             cName = nameE.get()
-            nameLen = len(cName.encode())
+            nameLen = len(cName.encode('utf-8'))
             if nameLen>20:
-                cName = cName.encode()[:20].decode(errors='ignore')
+                cName = cName.encode('utf-8')[:20].decode('utf-8',errors='ignore')
                 CreateOnceToolTip(nameE,'名字超长，自动裁切')
                 nameE.delete(0,tk.END)
                 nameE.insert(0,cName)
@@ -193,7 +193,7 @@ class GuiAppTabCharac:
             else:
                 sqlM.resume_baned(self.uid)
                 runOnUi(messagebox.showinfo,'提示','已解封该账号')
-            self.refill_baned_tree()
+            runOnUi(self.refill_baned_tree)   # 后台线程：封停树刷新必须回主线程
         
         def enable_auction(y=None,m=None):
             if y==None:

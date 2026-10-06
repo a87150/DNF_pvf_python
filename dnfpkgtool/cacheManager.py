@@ -20,6 +20,8 @@ logFunc = [oldPrint]
 def print(*args,**kw):
     logFunc[-1](*args,**kw)
 
+from dnfpkgtool.pvfJson import loadJsonFile as loadConfigJson   # 兼容读取 config/*.json
+
 encryptFunc = [lambda x:x]
 decryptFunc = [lambda x:x]
 
@@ -71,7 +73,7 @@ def save_config():
     cfgString = json.dumps(config,ensure_ascii=False)
     cfgStringEncrypted = encryptFunc[-1](cfgString)
     if isinstance(cfgStringEncrypted,str):
-        cfgStringEncrypted = cfgStringEncrypted.encode()
+        cfgStringEncrypted = cfgStringEncrypted.encode('utf-8')
     with open(configPath,'wb') as f:
         f.write(cfgStringEncrypted)
     cfgString = decryptFunc[-1](cfgStringEncrypted)
@@ -86,7 +88,7 @@ def load_config():
                 cfgStringEncrypted = open(configPath,'rb').read()
                 cfgString = func(cfgStringEncrypted)
                 if isinstance(cfgString,bytes):
-                    cfgString = cfgString.decode()
+                    cfgString = cfgString.decode('utf-8')
                 config = json.loads(cfgString)
                 if config.get('CONFIG_VERSION')!=CONFIG_VERSION:
                     '''config版本错误'''
@@ -230,7 +232,7 @@ class PVFCacheManager:
     def loadCacheList(self):
         if tinyCachePath.exists():
             try:
-                content = open(tinyCachePath,'r').read()
+                content = open(tinyCachePath,'r',encoding='utf-8').read()
                 self.tinyCache = json.loads(content)
 
                 if self.tinyCache['_cacheVersion']!=PVF_CACHE_VERSION:
@@ -264,7 +266,8 @@ class PVFCacheManager:
         self.saveTinyCache()
 
     def saveTinyCache(self):
-        json.dump(self.tinyCache,open(tinyCachePath,'w'))
+        with open(tinyCachePath,'w',encoding='utf-8') as f:
+            json.dump(self.tinyCache,f)
     
     def saveCache(self,PVFcacheDict={}):
         MD5 = PVFcacheDict.get('MD5')
@@ -776,10 +779,10 @@ def loadItems2(usePVF=False,pvfPath='',MD5='0',retType='log',encode='big5',useCa
                 print(item)
             else:
                 ITEMS_dict[int(item[1])] = item[0]
-        magicSealDict = json.load(open(magicDictPath,'r'))
-        jobDict = json.load(open(jobPath,'r',encoding='utf-8'))
-        avatarHiddenList_En = json.load(open(avatarPath,'r'))
-        expTableList = json.load(open(expTablePath,'r'))
+        magicSealDict = loadConfigJson(magicDictPath)
+        jobDict = loadConfigJson(jobPath)
+        avatarHiddenList_En = loadConfigJson(avatarPath)
+        expTableList = loadConfigJson(expTablePath)
         info = f'加载csv文件获得{len(ITEMS)}条物品信息记录，魔法封印{len(magicSealDict.keys())}条'
 
     for key,value in ITEMS_dict.items():

@@ -1,3 +1,4 @@
+import sys
 import platform
 import tkinter as tk
 import tkinter.ttk as ttk
@@ -24,41 +25,73 @@ import traceback
 # 取 inThread/runOnUi，appCommon 又反过来 import 它们，循环导入时这里还没执行到就会 AttributeError。
 _uiQueue = queue.Queue()
 _uiRoot = None
+UI_CALL_TIMEOUT = 60    # runOnUi 阻塞上限（秒）
+
+def _uiLog(text):
+    """泵自己的错误出口：写日志文件 + 打一份到 stderr（打包成 --windowed 时 stderr 是 None）。
+    不能用 appCommon.log()：它内部会调 runOnUi，泵出错时正好是 runOnUi 最可能死锁的时刻。"""
+    try:
+        import time as _time
+        tm = _time.localtime()
+        line = '[%s-%s %s:%s:%s] [UI泵] %s' % ('%02d' % tm.tm_mon, '%02d' % tm.tm_mday, '%02d' % tm.tm_hour, '%02d' % tm.tm_min, '%02d' % tm.tm_sec, text)
+        with open(LOGFile,'a+',encoding='utf-8') as f:
+            f.write(line + chr(10))
+    except BaseException:
+        pass
+    if sys.stderr is not None:      # --windowed 下是 None，print_exc/print 自己会抛
+        try:
+            print(line, file=sys.stderr)
+        except BaseException:
+            pass
 
 def runOnUi(func,*args,**kw):
     """在主线程执行 func 并返回结果。
-    主线程自己调用时直接执行；泵没启动（独立小工具）时退回原行为，直接在当前线程执行。"""
+    主线程自己调用时直接执行；泵没启动（独立小工具）时退回原行为，直接在当前线程执行。
+    泵死了也不允许永久挂起：最多等 UI_CALL_TIMEOUT 秒，超时先记录一条明确错误再抛 RuntimeError。"""
     if _uiRoot is None or threading.current_thread() is threading.main_thread():
         return func(*args,**kw)
     box = [None,None]
     done = threading.Event()
     _uiQueue.put((func,args,kw,box,done))
-    done.wait()
+    if not done.wait(UI_CALL_TIMEOUT):
+        _uiLog('等待主线程执行 %s 超过 %ss，主线程 UI 泵可能已停止' % (getattr(func,'__name__',func), UI_CALL_TIMEOUT))
+        raise RuntimeError('runOnUi 超时 %ss：主线程未响应（UI 泵可能已停止）：%s' % (UI_CALL_TIMEOUT, getattr(func,'__name__',func)))
     if box[1] is not None:
         raise box[1]
     return box[0]
 
 def startUiPump(root):
-    """建好 root、起任何线程之前调用一次；每 30ms 在主线程清一次队列。异常打到 stderr，不吞。"""
+    """建好 root、起任何线程之前调用一次；每 30ms 在主线程清一次队列。
+    异常只记录（写日志文件）绝不逃出回调：一旦逃出，root.after 不再 re-arm，之后所有
+    worker 线程的 runOnUi 就永久卡死——这正是连接流程连一句日志都没有的那种故障。"""
     global _uiRoot
     if _uiRoot is not None:
         return
     _uiRoot = root
     def pump():
-        while True:
+        try:
+            while True:
+                try:
+                    func,args,kw,box,done = _uiQueue.get_nowait()
+                except queue.Empty:
+                    break
+                try:
+                    box[0] = func(*args,**kw)
+                except BaseException as e:
+                    box[1] = e     # 回抛给调用线程
+                    _uiLog('执行 %s 出错：%s' % (getattr(func,'__name__',func), traceback.format_exc()))
+                finally:
+                    done.set()     # 无论如何都要放行等待中的线程
+        except BaseException:
+            _uiLog('泵异常（已继续运行）：%s' % traceback.format_exc())
+        finally:
             try:
-                func,args,kw,box,done = _uiQueue.get_nowait()
-            except queue.Empty:
-                break
-            try:
-                box[0] = func(*args,**kw)
-            except BaseException as e:
-                box[1] = e
-                traceback.print_exc()   # 异常回抛给调用线程，同时留一份到 stderr
-            finally:
-                done.set()
-        root.after(30,pump)
+                root.after(30,pump)    # re-arm 必须在 finally：root 销毁后这里会抛，属正常退出路径
+            except BaseException:
+                pass
     root.after(30,pump)
+
+from dnfpkgtool.pvfJson import loadJsonFile   # 兼容读取 config/*.json（UTF-8 / GBK），无循环 import
 
 def inThread(func):
     def inner(*args,**kw):
@@ -102,8 +135,8 @@ def print(*args,**kw):
             print2title(text)
         else:
             text = str(args)
-    except:
-        pass
+    except BaseException:
+        pass    # print2title 只是日志/标题通道，坏掉不能影响正常 print 落到日志文件
     logFunc[-1](*args,**kw)
 
 logPath = Path('log/')
@@ -232,7 +265,7 @@ def creat_cxv_pkg(t:ttk.Treeview,app:'GuiApp',tabName:str):
         for index in indexList:
             selItemSlots[index] = characItemDict[index]
         copyStringBytes = pickle.dumps(selItemSlots)
-        copyString = base64.b64encode(copyStringBytes).decode()
+        copyString = base64.b64encode(copyStringBytes).decode('utf-8')
         pyperclip.copy(copyString)
         print(f'[{itemName0}]等{len(indexList)}个物品数据已复制至剪贴板')
 

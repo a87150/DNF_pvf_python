@@ -1,5 +1,6 @@
 '''主窗口初始化与整体布局（GuiApp 的方法体，组合见 dnfpkgtool/__main__.py）'''
 from dnfpkgtool.appCommon import *
+from dnfpkgtool import characTableFrame
 
 
 class GuiAppInit:
@@ -893,6 +894,9 @@ class GuiAppInit:
         frame16.pack(fill="x", side="top")
         frame5.pack(side="top")
         self.tabView.add(frame5, text=' 封停 ')
+        self.characTableFrame = characTableFrame.CharactableframeWidget(self.tabView)
+        self.characTableFrame.pack(side="top")
+        self.tabView.add(self.characTableFrame, text=' 角色表 ')
         self.characMainFrame = ttk.Frame(self.tabView)
         self.characMainFrame.configure(height=200, width=200)
         frame3 = ttk.Frame(self.characMainFrame)

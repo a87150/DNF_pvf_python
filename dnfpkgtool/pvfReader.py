@@ -3,6 +3,7 @@ from struct import unpack
 from zhconv import convert
 import json
 from pathlib import Path
+from dnfpkgtool.pvfJson import loadJsonFile
 try:
     import multiprocessing
 except:
@@ -31,7 +32,7 @@ keywords = []
 keyWordPath = Path('./config/pvfKeywords.json')
 if keyWordPath.exists():
     try:
-        keywords = json.load(open(keyWordPath,'r'))
+        keywords = loadJsonFile(keyWordPath)
     except:
         pass
 
@@ -40,7 +41,7 @@ subKeywordsDict = {}
 keywordsDictPath = Path('./config/pvfKeywordsDict.json')
 if keywordsDictPath.exists():
     try:
-        keywordsDict = json.load(open(keywordsDictPath,'r'))
+        keywordsDict = loadJsonFile(keywordsDictPath)
     except:
         pass
 

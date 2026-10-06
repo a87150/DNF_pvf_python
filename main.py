@@ -8,6 +8,36 @@ import shutil
 import sys
 from pathlib import Path
 
+# --- PyMySQL 1.0.2 的 Windows 启动地雷 ---------------------------------------------
+# pymysql/connections.py 在 import 时算了一次 getpass.getuser()。
+# getuser() 先查 LOGNAME / USER / LNAME / USERNAME，查不到就 import pwd（Windows 没有），
+# 于是抛 OSError: No username set in the environment。
+# 打包成 exe 后环境里可能没有这些变量（本次就是这样），结果**主程序还没建窗口就退出**，
+# 连 log/ 都不会生成 —— 排查时看起来像"什么都没发生"。
+# 这里补一个假的 pwd 模块：getpass 只会用它拿用户名，拿不到会自动回退到环境变量。
+if 'pwd' not in sys.modules:
+    import types as _types
+    _pwd = _types.ModuleType('pwd')
+    def _user():
+        return (os.environ.get('USERNAME')
+                or os.environ.get('LOGNAME')
+                or os.environ.get('USER')
+                or os.environ.get('USERPROFILE', '').replace('\\', '/').rsplit('/', 1)[-1]
+                or 'user')
+    _pwd.getpwuid = lambda _uid: (_user(), '*', 0, 0, '', '', '')
+    _pwd.getpwnam = lambda _name: (_name, '*', 0, 0, '', '', '')
+    _pwd.struct_passwd = ()
+    sys.modules['pwd'] = _pwd
+    # getpass 还会走 pwd.getpwuid(os.getuid())，而 Windows 上 os.getuid 根本不存在
+    # （py3.13 起 getuser 只接住 ImportError/KeyError，AttributeError 会直接抛出去）。
+    if not hasattr(os, 'getuid'):
+        os.getuid = lambda: 0
+if not (os.environ.get('LOGNAME') or os.environ.get('USER')):
+    _u = os.environ.get('USERNAME') or os.environ.get('USERPROFILE', '').replace('\\', '/').rsplit('/', 1)[-1]
+    if _u:
+        os.environ.setdefault('LOGNAME', _u)
+# ----------------------------------------------------------------------------------
+
 FROZEN = getattr(sys, 'frozen', False)
 if FROZEN:
     BASE = Path(sys.executable).resolve().parent      # exe 同级目录（config/ 放这里）

@@ -1,4 +1,5 @@
 '''背包编辑器主窗口：GUI 主体按功能拆到 dnfpkgtool/gui*.py 的 mixin，这里只做组合、提供 run() 入口与 cxv 包生成'''
+import dnfpkgtool.appCommon as _appCommon
 from dnfpkgtool.appCommon import *
 from dnfpkgtool.guiInit import GuiAppInit
 from dnfpkgtool.guiTabMain import GuiAppTabMain
@@ -35,7 +36,10 @@ def run(finCallBackFunc=lambda:None,root_:tk.Tk=None):
             runOnUi(root.title,str(args))
         nonlocal lastTitleTimeStamp
         lastTitleTimeStamp = time.time()
-        log(*args)    
+        log(*args)
+    # appCommon 里的 print() 取的是 appCommon 自己的全局名；只在本模块 global 赋值等于没赋值，
+    # 结果就是 print2title 一直是那个 no-op lambda —— 标题永远不更新、log() 只剩显式调用。
+    _appCommon.print2title = print2title
 
     global root
     W = 720

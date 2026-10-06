@@ -524,10 +524,11 @@ class GuiAppTabGM:
                 import json,pathlib
                 EventPath = './config/eventList.json'
                 if self.localEventList is None and pathlib.Path(EventPath).exists():
-                    self.localEventList = json.load(open(EventPath,'r'))
+                    self.localEventList = loadJsonFile(EventPath)
                 if self.localEventList!= self.eventList:
                     if str(self.eventList).count('?')<30:
-                        json.dump(self.eventList,open(EventPath,'w'),ensure_ascii=False)
+                        with open(EventPath,'w',encoding='utf-8') as f:
+                            json.dump(self.eventList,f,ensure_ascii=False)
                     elif  self.localEventList is not None:
                         self.eventList = self.localEventList
                 eventList_new = [f'{item[0]}-{item[2]}' for item in self.eventList]
