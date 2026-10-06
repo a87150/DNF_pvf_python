@@ -1,8 +1,6 @@
 
 import tkinter as tk
 import tkinter.ttk as ttk
-import pyperclip
-import pickle
 
 
 

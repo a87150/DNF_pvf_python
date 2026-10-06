@@ -3,10 +3,9 @@ import tkinter as tk
 from tkinter.filedialog import askopenfilename
 from tkinter import ttk,messagebox
 import threading, time
-from dnfpkgtool.widgets.toolTip import CreateOnceToolTip,CreateToolTip
+from dnfpkgtool.widgets.toolTip import CreateToolTip
 from pathlib import Path
 import paramiko
-import os
 
 WIDTH,HEIGHT = cacheM.config['SIZE']
 def configFrame(frame:tk.Frame,state='disable'):

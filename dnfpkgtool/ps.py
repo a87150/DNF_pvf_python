@@ -1,7 +1,7 @@
-import  os,shutil,psutil
-from tkinter import ttk, messagebox
+import  os,psutil
+from tkinter import messagebox
 import subprocess
-from tkinter.filedialog import askopenfilename, asksaveasfilename
+from tkinter.filedialog import asksaveasfilename
 from pathlib import Path
 import threading
 import time
@@ -24,6 +24,7 @@ def getDNF():
 def saveStart(runFunc=lambda:...):
     def inner():
         global workingFlg
+        from dnfpkgtool.appCommon import runOnUi   # inner 跑在后台线程：文件框必须回主线程（py3.14）
         workingFlg = True
         print('搜寻DNF进程中...')
         dnfCMDLines = getDNF()
@@ -42,7 +43,7 @@ def saveStart(runFunc=lambda:...):
         startCMD = 'start '+ ' '.join(dnfCMDLines[0].cmdline())
         
         b2ePath = os.path.join(os.getcwd(),B2E_PATH)
-        outPath = Path(asksaveasfilename(title=f'请保存至DNF.exe同级游戏目录',filetypes=[('可执行文件',f'*.exe')],initialfile=f'DNF一键登录.exe',initialdir=dnfPath.parent))
+        outPath = Path(runOnUi(asksaveasfilename,title=f'请保存至DNF.exe同级游戏目录',filetypes=[('可执行文件',f'*.exe')],initialfile=f'DNF一键登录.exe',initialdir=dnfPath.parent))
         if len(str(outPath))<2:
             return False
         if str(outPath)[-4:]!='.exe':

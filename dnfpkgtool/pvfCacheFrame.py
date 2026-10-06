@@ -2,7 +2,7 @@ from dnfpkgtool import cacheManager as cacheM
 from dnfpkgtool.widgets.titleBar import TitleBarFrame
 import tkinter as tk
 from tkinter import ttk, messagebox
-from tkinter.filedialog import askopenfilename, asksaveasfilename
+from tkinter.filedialog import asksaveasfilename
 from dnfpkgtool.widgets.toolTip import CreateToolTip
 import time
 import csv

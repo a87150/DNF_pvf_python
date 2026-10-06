@@ -6,7 +6,6 @@ import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import messagebox
 from tkinter.filedialog import askopenfilename,asksaveasfilename
-import json
 import zlib
 import pickle
 try:
@@ -1537,7 +1536,6 @@ class PvfeditequipmentframeWidget(ttk.Frame):
         self.editIndex += 1
 
     def update_with_PVF(self):
-        print(cacheM.PVFcacheDict.keys())#['jobTagDict'])
         self.jobTagDictRev = {value:key for key,value in cacheM.PVFcacheDict.get('jobTagDict').items()}        
         for skillEntrys in self.skillEntrys:
             skillEntrys[0][0].config(values=[f'{key}-{value}' for key,value in cacheM.PVFcacheDict.get('jobTagDict').items()])
@@ -1715,10 +1713,11 @@ class PvfeditmainframeApp:
     
     def open_PVF(self):
         def inner():
+            from dnfpkgtool.appCommon import runOnUi   # inner 跑在后台线程：文件框和控件刷新都必须回主线程（py3.14）
             # 同进程复用背包编辑器已加载的 PVF：路径与编码都沿用缓存，避免重复导入
             PVF = str(cacheM.PVFcacheDict.get('pvfPath') or '')
             if PVF == '' or not Path(PVF).exists():
-                PVF = askopenfilename(filetypes=[('DNF Script.pvf file','*.pvf')])
+                PVF = runOnUi(askopenfilename,filetypes=[('DNF Script.pvf file','*.pvf')])
             enc = cacheM.PVFcacheDict.get('encode') or 'big5'
             p = Path(PVF)
             if PVF!='' and p.exists():
@@ -1735,13 +1734,13 @@ class PvfeditmainframeApp:
                 self.lstDict['equipment'] = LstEditor(pvf.read_File_In_Decrypted_Bin(equLstPath),pvf.stringTable,baseDir='equipment',suffix='.equ')
                 self.equTab.lst = self.lstDict['equipment']
                 self.equTab.pvf = pvf
-                self.equTab.update_with_PVF()
+                runOnUi(self.equTab.update_with_PVF)
 
                 self.etcTab.pvf = pvf
-                self.etcTab.on_PVF_load()
+                runOnUi(self.etcTab.on_PVF_load)
 
                 self.sklTab.pvf = pvf
-                self.sklTab.on_PVF_load()
+                runOnUi(self.sklTab.on_PVF_load)
 
 
                 self.log('PVF文件已加载')
@@ -1819,6 +1818,7 @@ class PvfeditmainframeApp:
 
     def export_PVF(self):
         def inner():
+            from dnfpkgtool.appCommon import runOnUi   # inner 跑在后台线程：弹框必须回主线程（py3.14）
             if self.pvf is None:
                 self.log('当前未加载PVF文件，操作取消')
                 return False
@@ -1837,8 +1837,8 @@ class PvfeditmainframeApp:
                         editLeafs[leaf['filePath']] = leaf
                     else:
                         newLeafs[tab.leafType][tmpID] = leaf
-            messagebox.askokcancel('注意事项','此工具为测试版本！请在替换PVF前对原始文件进行备份！')
-            savePath = asksaveasfilename(title=f'保存文件(.pvf)',filetypes=[('二进制文件',f'*.pvf')],initialfile=f'Script_new.pvf')
+            runOnUi(messagebox.askokcancel,'注意事项','此工具为测试版本！请在替换PVF前对原始文件进行备份！')
+            savePath = runOnUi(asksaveasfilename,title=f'保存文件(.pvf)',filetypes=[('二进制文件',f'*.pvf')],initialfile=f'Script_new.pvf')
             if savePath=='':
                 self.log('文件路径错误，操作取消')
                 return False
@@ -1880,8 +1880,10 @@ class PvfeditmainframeApp:
 
 
 if __name__ == "__main__":
+    from dnfpkgtool.appCommon import startUiPump
     IconPath = 'config/ico.ico'
     root = tk.Tk()
+    startUiPump(root)   # 单独跑编辑器时也要有主线程泵，否则 runOnUi 退回后台线程直接执行（py3.14 会 RuntimeError）
     root.iconbitmap(IconPath)
     root.title('PVF编辑器 测试版')
     app = PvfeditmainframeApp(root)

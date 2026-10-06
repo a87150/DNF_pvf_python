@@ -8,7 +8,6 @@ if __name__=='__main__':
     sys.path.append(os.getcwd())
 import pymysql 
 from pymysql.constants import CLIENT
-import json
 from dnfpkgtool import cacheManager as cacheM
 from zhconv import convert
 import time 
@@ -1234,7 +1233,8 @@ def restore_db(db,bakPath='sql_backup'):
     if errorTables!=[]:
         print(f'{db}备份文件损坏，以下表无法恢复')
         print(errorTables)
-        if not messagebox.askokcancel('提示',f'{db}备份文件不完整，该数据库以下表无法恢复，是否继续？\n{errorTables}'):
+        from dnfpkgtool.appCommon import runOnUi   # restore_db 跑在后台线程，messagebox 必须回主线程（py3.14 非主线程调控件会 RuntimeError）
+        if not runOnUi(messagebox.askokcancel,'提示',f'{db}备份文件不完整，该数据库以下表无法恢复，是否继续？\n{errorTables}'):
             return
     print(f'---{db}恢复开始')
     #print(db_bytes,db_all_dict)

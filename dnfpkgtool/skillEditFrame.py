@@ -585,28 +585,13 @@ class SkilleditframeWidget(ttk.Frame):
 
 
 
-    def refill_treeview(self):
-        '''用于读取PVF编辑'''
-        for child in self.editedTree.get_children():
-            self.editedTree.delete(child)
-        for eid,leaf in self.editLeafDict.items():
-            values = [eid,leaf['itemInDict'].get('[name]'),leaf['itemID']]
-            item = self.editedTree.insert('',tk.END,values=values)
-            print(values)
-        if self.editLeafDict=={}:
-            return False
-        self.editIndex = max(list(self.editLeafDict.keys())) + 1
-        self.currentLeaf = None
-        self.filePathE.config(state='normal')
-        clearFrame(self.itemEditFrame)
-        self.filePathE.config(state='readonly')
-
     def remove_selected_item(self):
-        selectedItem = self.editedTree.selection()
-        editID = self.editedTree.item(selectedItem)['values'][0]
-        self.editedTree.delete(selectedItem)
-        if self.editLeafDict.get(editID) is not None:
-            self.editLeafDict.pop(editID)
+        # 左侧"已编辑列表"是 editedBox（tk.Listbox，见 __init__ 与 update_Edited_Box），这里原来错写成 Treeview 的 editedTree
+        for index in reversed(self.editedBox.curselection()):
+            filePath = self.editedBox.get(index)
+            self.editedBox.delete(index)
+            if self.editLeafDict.get(filePath) is not None:
+                self.editLeafDict.pop(filePath)
 
 
 
