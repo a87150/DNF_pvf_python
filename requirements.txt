@@ -3,10 +3,10 @@
 
 # --- 界面 ---
 ttkbootstrap>=1.10,<3
-Pillow>=10,<13
+Pillow>=10,<13             # ttkbootstrap 运行期硬依赖（style/assets.py、style/elements.py 用 PIL 渲染主题素材），不能移除
+
 pyperclip>=1.8,<2
-pyqrcode>=1.2,<2
-pypng>=0.20220715          # pyqrcode 输出 PNG 用
+# 二维码功能已移除，pyqrcode/pypng 都不再需要
 jsoneditor>=1.6,<2         # PVF 高级编辑（浏览器 JSON 编辑器），3.14 实测可用
 
 # --- 数据 / 系统 ---

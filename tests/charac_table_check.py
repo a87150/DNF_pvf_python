@@ -320,8 +320,12 @@ else:
         liveCur.execute(f'select count(*) from taiwan_cain.charac_info where charac_no={REAL_CNO}')
         check('往返：charac_info 行数与真库 SELECT 一致',
               len(dump['charac_info']) == int(liveCur.fetchone()[0]))
-        check('往返：charac_info 首行前 8 个标量相同',
-              tuple(dump['charac_info'][0][:8]) == tuple(real['charac_info'][0][:8]))
+        # 真文件是 10-06 的快照，角色在线还在升级（本轮实测 46→47），逐值对照必然漂；改跟真库当前行对，
+        # 仍然能抓出列序/编码回归，但不受快照漂移影响。
+        liveCur.execute(f'select * from taiwan_cain.charac_info where charac_no={REAL_CNO}')
+        liveRow = liveCur.fetchone()
+        check('往返：charac_info 首行前 8 个标量与真库当前行一致',
+              tuple(dump['charac_info'][0][:8]) == tuple(liveRow[:8]))
         check('往返：每表行宽 == 真库 information_schema 列数（恢复不会报列数不符）',
               all(len(dump[t][0]) == len(CT._columns(db, t))
                   for t, (db, key) in CT.BAK_TABLES.items() if dump[t]))

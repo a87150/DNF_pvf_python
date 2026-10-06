@@ -44,12 +44,19 @@ def main():
         app = holder['app']
         check('主窗口无 imageFrame1（查询页广告位已删）', not hasattr(app, 'imageFrame1'))
         check('主窗口无 aboutImageLabel（关于页图片已删）', not hasattr(app, 'aboutImageLabel'))
+        check('主窗口无 qrLabel/qrCode（关于页二维码已删）', not hasattr(app, 'qrLabel') and not hasattr(app, 'qrCode'))
         check('主窗口无 sponsorFrame 开关（GM 广告页已删）', not hasattr(app, 'sponsorFrame'))
         check('tabViewChangeFuncs 无残留回调', app.tabViewChangeFuncs == [])
         check('其它页 GitHub 位仍是容器', hasattr(app, 'gitHubFrame'))
         if hasattr(app, 'gitHubFrame'):
             btns = [k for k in descendants(app.gitHubFrame) if isinstance(k, tk.ttk.Button)]
-            check('该容器里换成了按钮', len(btns) == 1)
+            check('关于页不再有「项目地址 / 交流群」按钮', len(btns) == 0)
+            links = [k for k in descendants(app.gitHubFrame)
+                     if isinstance(k, tk.Label) and k.cget('cursor') == 'hand2']
+            check('关于页有两条可点击链接',
+                  len(links) == 2 and all(k.bind('<Button-1>') for k in links))
+            check('链接文案是原项目地址 / 本项目地址',
+                  sorted(k.cget('text') for k in links) == ['原项目地址', '本项目地址'])
         check('主窗口有全局日志区', hasattr(app, 'logTextE') and hasattr(app, 'logFrame'))
         M.log('__全局日志自检__')
         check('全局日志能收到消息', '__全局日志自检__' in app.logTextE.get('1.0', 'end'))

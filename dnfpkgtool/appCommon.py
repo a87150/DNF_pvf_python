@@ -110,7 +110,6 @@ from copy import deepcopy
 import struct
 from dnfpkgtool.widgets.toolTip import CreateToolTip, CreateOnceToolTip, ToolTip
 from dnfpkgtool import ps
-import webbrowser
 from dnfpkgtool.widgets.titleBar import TitleBarFrame
 from dnfpkgtool import pvfEditorGUI
 #from dnfpkgtool import findServerFrame
@@ -121,7 +120,6 @@ import pickle
 import json
 import base64
 import datetime
-import pyqrcode
 
 WIDTH = 1
 
@@ -222,18 +220,6 @@ def configBtnPack(frame:tk.Frame,value=1,attr='padx'):
                     continue
         else:
             configBtnPack(widget,value,attr)
-
-def openWeb(e=None): 
-    webbrowser.open(cacheM.config['TIEBA'])
-    webbrowser.open(cacheM.config['GITHUB'])
-    #webbrowser.open(cacheM.config['QQ'])
-    #webbrowser.open(cacheM.config['PROVIDER'])
-
-class GitHubFrame(tk.Frame):
-    def __init__(self,*args,**kw):
-        tk.Frame.__init__(self,*args,**kw)
-        ttk.Button(self,text='项目地址 / 交流群',command=openWeb).pack()
-        CreateToolTip(self,f'点击加入群聊查看最新动态')
 
 letter_send_dict = {}
 

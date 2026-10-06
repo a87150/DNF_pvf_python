@@ -372,7 +372,6 @@ class GuiAppTabCharac:
         isReturnUser = characF.isReturnUser
         commitBtn = characF.commitBtn
         commitBtn.config(command=commit)
-        GitHubFrame(characF.gitHubFrame).pack()
 
         self.cInfoSetBanedBtn.bind('<Button-1>',set_ban_var)
 

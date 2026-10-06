@@ -1,4 +1,5 @@
 '''主窗口初始化与整体布局（GuiApp 的方法体，组合见 dnfpkgtool/__main__.py）'''
+import webbrowser
 from dnfpkgtool.appCommon import *
 from dnfpkgtool import characTableFrame
 
@@ -945,6 +946,26 @@ class GuiAppInit:
         self.otherFunctionFrame.pack(fill="y", side="left")
         self.gitHubFrame = ttk.Frame(frame3)
         self.gitHubFrame.configure(height=160, width=160)
+        label64 = tk.Label(
+            self.gitHubFrame,
+            text='原项目地址',
+            foreground='#0a66c2',
+            font=('微软雅黑', 9, 'underline'),
+            cursor='hand2')
+        label64.pack(anchor="w", side="top")
+        label64.bind(
+            '<Button-1>',
+            lambda e: webbrowser.open('https://github.com/Zageku/DNF_pvf_python'))
+        label65 = tk.Label(
+            self.gitHubFrame,
+            text='本项目地址',
+            foreground='#0a66c2',
+            font=('微软雅黑', 9, 'underline'),
+            cursor='hand2')
+        label65.pack(anchor="w", side="top")
+        label65.bind(
+            '<Button-1>',
+            lambda e: webbrowser.open('https://github.com/a87150/DNF_pvf_python'))
         self.gitHubFrame.pack(side="right")
         frame34 = ttk.Frame(frame3)
         frame34.configure(height=200, width=200)
@@ -1220,9 +1241,6 @@ class GuiAppInit:
         label45.pack(anchor="e", side="top")
         frame1.pack(anchor="w", expand=True, side="right")
         frame31.pack(side="right")
-        self.qrLabel = ttk.Label(frame33)
-        self.qrLabel.configure(width=10)
-        self.qrLabel.pack(anchor="e", expand=False, fill="both", side="right")
         frame33.pack(padx=20, side="top")
         frame32.pack(side="top")
         frame24.pack(anchor="n", expand=True, fill="x", side="top")
@@ -1468,14 +1486,6 @@ class GuiAppInit:
 
         self.create_CXV()
         self.get_online_num()
-
-
-        qrCodeStr = 'https://jq.qq.com/?_wv=1027&k=vMnki7kh'
-        code=pyqrcode.create(qrCodeStr)#需要显示中文encoding='UTF-8'即可
-        cXbm=code.xbm(scale=2)#scale生成的二维码图片比例大小
-        self.qrCode=tk.BitmapImage(data=cXbm)
-        self.qrCode.config(foreground="black")
-        self.qrLabel.configure(image=self.qrCode)
 
         theme = cacheM.config.get('THEME','默认主题')
         self.themeE.set(value=theme)
